@@ -4,7 +4,6 @@
 #include "logos_types.h"
 #include "logos_instance.h"
 
-#include <QDateTime>
 #include <QDebug>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -48,19 +47,16 @@ void LogosDeliveryDemoPlugin::wireEvents()
         // layer is byte-agnostic — this demo just treats payloads as UTF-8 text.
         const QByteArray decoded = QByteArray::fromBase64(data.at(2).toString().toUtf8());
 
-        // data[3] on messageReceived is the waku message's network timestamp in
-        // nanoseconds since epoch — unlike the other events which carry a
-        // local-clock ISO-8601 string. Convert here so the UI sees one format.
-        const qint64 nanos = data.at(3).toString().toLongLong();
-        const QString tsIso = nanos > 0
-            ? QDateTime::fromMSecsSinceEpoch(nanos / 1'000'000, Qt::UTC).toString(Qt::ISODateWithMs)
-            : QStringLiteral("(no timestamp)");
-
+        // data[3] arrives as nanoseconds since epoch on messageReceived, while
+        // every other event emits a local ISO-8601 string in the same slot.
+        // Passing it through verbatim so the inconsistency is visible to
+        // anyone reading the demo. Tracked at
+        // https://github.com/logos-co/logos-delivery-module/issues/26
         emit messageReceived(
             data.at(1).toString(),                 // contentTopic
             QString::fromUtf8(decoded),            // payload (utf-8 decoded)
             data.at(0).toString(),                 // messageHash
-            tsIso);                                // timestamp (ISO-8601 UTC)
+            data.at(3).toString());                // timestamp (raw — see #26)
     });
 
     m_logos->delivery_module.on("messageSent", [this](const QVariantList& data) {
