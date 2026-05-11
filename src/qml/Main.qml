@@ -220,7 +220,7 @@ Item {
                         text: root.peerIdValue.length > 0
                               ? root.peerIdValue
                               : "(not available yet — getNodeInfo(\"MyPeerId\"))"
-                        font.pixelSize: Theme.typography.secondaryText
+                        font.pixelSize: Theme.typography.primaryText
                         font.family: "monospace"
                         elide: Text.ElideMiddle
                         Layout.fillWidth: true
@@ -259,7 +259,7 @@ Item {
                         verticalAlignment: Text.AlignVCenter
                         text: root.lastErrorValue
                         color: Theme.palette.error
-                        font.pixelSize: Theme.typography.secondaryText
+                        font.pixelSize: Theme.typography.primaryText
                     }
                 }
             }
@@ -355,7 +355,7 @@ Item {
 
                                 LogosText {
                                     text: modelData
-                                    font.pixelSize: Theme.typography.secondaryText
+                                    font.pixelSize: Theme.typography.primaryText
                                     color: modelData === root.selectedTopic
                                            ? Theme.palette.background
                                            : Theme.palette.text
@@ -545,7 +545,7 @@ Item {
                 LogosText {
                     text: evt ? evt.eventName : ""
                     font.weight: Theme.typography.weightBold
-                    font.pixelSize: Theme.typography.secondaryText
+                    font.pixelSize: Theme.typography.primaryText
                     color: accent
                 }
                 LogosText {
@@ -591,7 +591,7 @@ Item {
         }
         LogosText {
             text: value
-            font.pixelSize: Theme.typography.secondaryText
+            font.pixelSize: Theme.typography.primaryText
             font.family: mono ? "monospace" : Theme.typography.publicSans
             color: isError ? Theme.palette.error : Theme.palette.text
             wrapMode: multiline ? Text.WrapAnywhere : Text.NoWrap
