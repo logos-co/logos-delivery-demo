@@ -42,26 +42,30 @@ void LogosDeliveryDemoPlugin::wireEvents()
 
     m_logos->delivery_module.on("messageReceived", [this](const QVariantList& data) {
         if (data.size() < 4) return;
+        // The module event contract declares data[2] as a base64-encoded payload
+        // (because the QString event channel is text). The underlying delivery
+        // layer is byte-agnostic — this demo just treats payloads as UTF-8 text.
+        const QByteArray decoded = QByteArray::fromBase64(data.at(2).toString().toUtf8());
         emit messageReceived(
-            data.at(1).toString(),  // contentTopic
-            data.at(2).toString(),  // payload (base64)
-            data.at(0).toString(),  // messageHash
-            data.at(3).toString()); // timestamp
+            data.at(1).toString(),                 // contentTopic
+            QString::fromUtf8(decoded),            // payload (utf-8 decoded)
+            data.at(0).toString(),                 // messageHash
+            data.at(3).toString());                // timestamp
     });
 
     m_logos->delivery_module.on("messageSent", [this](const QVariantList& data) {
-        if (data.size() < 2) return;
-        emit messageSentNotif(data.at(0).toString(), data.at(1).toString());
+        if (data.size() < 3) return;
+        emit messageSentNotif(data.at(0).toString(), data.at(1).toString(), data.at(2).toString());
     });
 
     m_logos->delivery_module.on("messagePropagated", [this](const QVariantList& data) {
-        if (data.size() < 2) return;
-        emit messagePropagatedNotif(data.at(0).toString(), data.at(1).toString());
+        if (data.size() < 3) return;
+        emit messagePropagatedNotif(data.at(0).toString(), data.at(1).toString(), data.at(2).toString());
     });
 
     m_logos->delivery_module.on("messageError", [this](const QVariantList& data) {
-        if (data.size() < 3) return;
-        emit messageErrorNotif(data.at(0).toString(), data.at(2).toString());
+        if (data.size() < 4) return;
+        emit messageErrorNotif(data.at(0).toString(), data.at(1).toString(), data.at(2).toString(), data.at(3).toString());
     });
 }
 
