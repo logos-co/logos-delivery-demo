@@ -524,26 +524,26 @@ Item {
                     color: accent
                 }
                 LogosText {
-                    visible: evt && evt.direction
                     text: evt && evt.direction ? "(" + evt.direction + ")" : ""
+                    visible: text.length > 0
                     font.pixelSize: Theme.typography.secondaryText
                     color: Theme.palette.textSecondary
                 }
                 Item { Layout.fillWidth: true }
                 LogosText {
-                    visible: evt && evt.ts
                     text: evt && evt.ts ? evt.ts : ""
+                    visible: text.length > 0
                     font.family: "monospace"
                     font.pixelSize: Theme.typography.secondaryText
                     color: Theme.palette.textSecondary
                 }
             }
 
-            FieldRow { visible: evt && evt.topic;      name: "topic";      value: evt ? evt.topic       || "" : "" }
-            FieldRow { visible: evt && evt.payload;    name: "payload";    value: evt ? evt.payload     || "" : ""; multiline: true }
-            FieldRow { visible: evt && evt.hash;       name: "hash";       value: evt ? evt.hash        || "" : ""; mono: true }
-            FieldRow { visible: evt && evt.requestId;  name: "requestId";  value: evt ? evt.requestId   || "" : ""; mono: true }
-            FieldRow { visible: evt && evt.errorText;  name: "error";      value: evt ? evt.errorText   || "" : ""; isError: true }
+            FieldRow { name: "topic";     value: evt ? evt.topic     || "" : "" }
+            FieldRow { name: "payload";   value: evt ? evt.payload   || "" : ""; multiline: true }
+            FieldRow { name: "hash";      value: evt ? evt.hash      || "" : ""; mono: true }
+            FieldRow { name: "requestId"; value: evt ? evt.requestId || "" : ""; mono: true }
+            FieldRow { name: "error";     value: evt ? evt.errorText || "" : ""; isError: true }
         }
     }
 
@@ -554,6 +554,10 @@ Item {
         property bool   multiline: false
         property bool   isError: false
 
+        // Self-hide when the value is empty so events only render fields they
+        // actually carry (e.g. messageSent has no topic/payload, subscribe()
+        // returned has no error on success).
+        visible: value.length > 0
         Layout.fillWidth: true
         spacing: Theme.spacing.small
 
