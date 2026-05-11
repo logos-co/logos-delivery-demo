@@ -199,7 +199,7 @@ Item {
                         color: root.peerCountValue > 0 ? Theme.palette.success : Theme.palette.textSecondary
 
                         HoverHandler { id: peersHover }
-                        LogosToolTip {
+                        ReadableToolTip {
                             visible: peersHover.hovered
                             text: "Polled from delivery_module.getNodeInfo(\"Metrics\") every 3s — parsed from the libp2p_peers gauge."
                         }
@@ -226,7 +226,7 @@ Item {
                         Layout.fillWidth: true
 
                         HoverHandler { id: peerIdHover; enabled: root.peerIdValue.length > 0 }
-                        LogosToolTip {
+                        ReadableToolTip {
                             visible: peerIdHover.hovered
                             text: "delivery_module.getNodeInfo(\"MyPeerId\")"
                         }
@@ -237,7 +237,7 @@ Item {
                         color: Theme.palette.textSecondary
 
                         HoverHandler { id: shiftHover }
-                        LogosToolTip {
+                        ReadableToolTip {
                             visible: shiftHover.hovered
                             text: "Hashed from LogosInstance::id() so two demo instances on one host don't collide on tcp/rest/metrics/discv5 ports."
                         }
@@ -481,10 +481,18 @@ Item {
             color: Theme.palette.textSecondary
         }
         HoverHandler { id: infoHover; cursorShape: Qt.PointingHandCursor }
-        LogosToolTip {
+        ReadableToolTip {
             visible: infoHover.hovered && tip.length > 0
             text: tip
         }
+    }
+
+    // LogosToolTip's defaults (backgroundSecondary bubble + 60%-opacity text)
+    // are essentially invisible against this demo's backgroundSecondary panels.
+    // Override to backgroundElevated + full-opacity text for legibility.
+    component ReadableToolTip: LogosToolTip {
+        tipColor: Theme.palette.backgroundElevated
+        textColor: Theme.palette.text
     }
 
     // Developer-facing event row. Renders every field of the event verbatim.
