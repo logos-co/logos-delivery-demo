@@ -10,12 +10,9 @@ Item {
 
     readonly property var backend: logos.module("logos_delivery_demo")
 
-    // Event log per topic. Each entry is one observed event:
+    // Single global event log. Each entry is an observed event:
     //   { eventName, direction, topic, payload, hash, requestId, errorText, ts }
-    // The view renders events verbatim — this is a developer demo.
-    property var eventsByTopic: ({})
-    property var topicList: []
-    property string selectedTopic: ""
+    property var events: []
 
     readonly property string nodeStatus:    backend ? backend.connectionStatus : "no backend"
     readonly property bool   nodeReady:     backend ? backend.nodeReady       : false
@@ -28,7 +25,7 @@ Item {
         ignoreUnknownSignals: true
 
         function onMessageReceived(topic, payload, messageHash, timestamp) {
-            root.logEvent(topic, {
+            root.logEvent({
                 eventName: "messageReceived",
                 direction: "in",
                 topic: topic,
@@ -37,9 +34,8 @@ Item {
                 ts: timestamp
             })
         }
-
         function onMessageSentNotif(requestId, messageHash, timestamp) {
-            root.logEvent(null, {
+            root.logEvent({
                 eventName: "messageSent",
                 direction: "out",
                 requestId: requestId,
@@ -47,9 +43,8 @@ Item {
                 ts: timestamp
             })
         }
-
         function onMessagePropagatedNotif(requestId, messageHash, timestamp) {
-            root.logEvent(null, {
+            root.logEvent({
                 eventName: "messagePropagated",
                 direction: "out",
                 requestId: requestId,
@@ -57,9 +52,8 @@ Item {
                 ts: timestamp
             })
         }
-
         function onMessageErrorNotif(requestId, messageHash, errorText, timestamp) {
-            root.logEvent(null, {
+            root.logEvent({
                 eventName: "messageError",
                 direction: "out",
                 requestId: requestId,
@@ -70,79 +64,57 @@ Item {
         }
     }
 
-    // Append an event into the per-topic log. When `topic` is null (lifecycle
-    // events without a topic field), the entry is placed on the currently
-    // selected topic so the user can see correlation with the message they sent.
-    function logEvent(topic, evt) {
-        const targetTopic = topic && topic.length > 0 ? topic : root.selectedTopic
-        if (!targetTopic) return
-        const cur = root.eventsByTopic[targetTopic] || []
-        cur.push(evt)
-        const next = Object.assign({}, root.eventsByTopic)
-        next[targetTopic] = cur
-        root.eventsByTopic = next
-        if (targetTopic === root.selectedTopic) eventView.model = cur
+    function logEvent(evt) {
+        const next = root.events.slice()
+        next.push(evt)
+        root.events = next
+        // Auto-scroll to the newest entry.
+        Qt.callLater(eventView.positionViewAtEnd)
     }
 
-    function addTopic(topic) {
-        const trimmed = (topic || "").trim()
-        if (!trimmed) return
-        if (root.topicList.indexOf(trimmed) >= 0) {
-            root.selectedTopic = trimmed
-            eventView.model = root.eventsByTopic[trimmed] || []
-            return
-        }
-        logos.watch(backend.subscribe(trimmed),
-            function(err) {
-                if (err && err.length > 0) return
-                root.topicList = root.topicList.concat([trimmed])
-                const next = Object.assign({}, root.eventsByTopic)
-                next[trimmed] = []
-                root.eventsByTopic = next
-                root.selectedTopic = trimmed
-                eventView.model = next[trimmed]
-                root.logEvent(trimmed, {
+    // ── Method-call invocations (logged as local events) ──────────────────────
+
+    function callSubscribe(topic) {
+        if (!topic) return
+        logos.watch(backend.subscribe(topic),
+            function(errStr) {
+                root.logEvent({
                     eventName: "subscribe() returned",
                     direction: "local",
-                    topic: trimmed
+                    topic: topic,
+                    errorText: errStr || ""
                 })
-                topicInput.text = ""
             },
             function(_e) {}
         )
     }
 
-    function removeTopic(topic) {
+    function callUnsubscribe(topic) {
         if (!topic) return
         logos.watch(backend.unsubscribe(topic),
-            function(err) {
-                if (err && err.length > 0) return
-                root.topicList = root.topicList.filter(function(t) { return t !== topic })
-                const next = Object.assign({}, root.eventsByTopic)
-                delete next[topic]
-                root.eventsByTopic = next
-                if (root.selectedTopic === topic) {
-                    root.selectedTopic = root.topicList.length > 0 ? root.topicList[0] : ""
-                    eventView.model = root.selectedTopic ? (next[root.selectedTopic] || []) : []
-                }
+            function(errStr) {
+                root.logEvent({
+                    eventName: "unsubscribe() returned",
+                    direction: "local",
+                    topic: topic,
+                    errorText: errStr || ""
+                })
             },
             function(_e) {}
         )
     }
 
-    function sendOutgoing(topic, text) {
-        if (!topic || !text) return
-        logos.watch(backend.sendMessage(topic, text),
+    function callSend(topic, payload) {
+        if (!topic || !payload) return
+        logos.watch(backend.sendMessage(topic, payload),
             function(requestId) {
-                if (!requestId || requestId.length === 0) return
-                root.logEvent(topic, {
+                root.logEvent({
                     eventName: "send() returned",
                     direction: "local",
                     topic: topic,
-                    payload: text,
-                    requestId: requestId
+                    payload: payload,
+                    requestId: requestId || "(empty — see lastError)"
                 })
-                sendInput.text = ""
             },
             function(_e) {}
         )
@@ -160,7 +132,7 @@ Item {
         anchors.margins: Theme.spacing.small
         spacing: Theme.spacing.small
 
-        // ─── Header / health area ────────────────────────────────────────────
+        // ─── Header / health ─────────────────────────────────────────────────
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: headerCol.implicitHeight + Theme.spacing.medium * 2
@@ -175,7 +147,6 @@ Item {
                 anchors.margins: Theme.spacing.medium
                 spacing: Theme.spacing.small
 
-                // Row 1: title + badges with adjacent info chips
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: Theme.spacing.medium
@@ -205,7 +176,6 @@ Item {
                     }
                 }
 
-                // Row 2: Peer ID (full id rendered as monospace text)
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: Theme.spacing.small
@@ -231,7 +201,6 @@ Item {
                     }
                 }
 
-                // Error line (only when non-empty)
                 Rectangle {
                     visible: root.lastErrorValue.length > 0
                     Layout.fillWidth: true
@@ -252,211 +221,94 @@ Item {
             }
         }
 
-        // ─── Body ─────────────────────────────────────────────────────────────
-        RowLayout {
+        // ─── Event log (full width, all topics) ──────────────────────────────
+        Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            spacing: Theme.spacing.small
+            color: Theme.palette.backgroundSecondary
+            radius: Theme.spacing.radiusMedium
+            border.width: 1
+            border.color: Theme.palette.borderHairline
+            clip: true
 
-            // ── Left: content topics ─────────────────────────────────────────
-            Rectangle {
-                Layout.preferredWidth: 280
-                Layout.fillHeight: true
-                color: Theme.palette.backgroundSecondary
-                radius: Theme.spacing.radiusMedium
-                border.width: 1
-                border.color: Theme.palette.borderHairline
-                clip: true
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: Theme.spacing.medium
+                spacing: Theme.spacing.small
 
-                ColumnLayout {
-                    anchors.fill: parent
-                    spacing: 0
-
-                    // Header (margin-padded)
-                    RowLayout {
+                RowLayout {
+                    Layout.fillWidth: true
+                    LogosText {
+                        text: "Event log"
+                        font.pixelSize: Theme.typography.subtitleText
+                        font.weight: Theme.typography.weightBold
                         Layout.fillWidth: true
-                        Layout.margins: Theme.spacing.medium
-                        spacing: Theme.spacing.small
-
-                        LogosText {
-                            text: "Content topics"
-                            font.pixelSize: Theme.typography.subtitleText
-                            font.weight: Theme.typography.weightBold
-                            Layout.fillWidth: true
-                        }
-                        InfoChip {
-                            tip: "<b>Content topics</b> — the libp2p pubsub topics this node is subscribed to.<br><br>"
-                               + "Adding a topic calls <code>delivery_module.subscribe(topic)</code>.<br>"
-                               + "Removing one calls <code>delivery_module.unsubscribe(topic)</code>.<br>"
-                               + "Both return a <code>LogosResult</code>; the demo logs the return value as a local event."
-                        }
                     }
-
-                    // Input row
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Layout.leftMargin: Theme.spacing.medium
-                        Layout.rightMargin: Theme.spacing.medium
-                        Layout.bottomMargin: Theme.spacing.small
-                        spacing: Theme.spacing.small
-
-                        LogosTextField {
-                            id: topicInput
-                            placeholderText: "/myapp/1/chat/proto"
-                            Layout.fillWidth: true
-                        }
-                        Connections {
-                            target: topicInput.textInput
-                            function onAccepted() { root.addTopic(topicInput.text) }
-                        }
-                        LogosButton {
-                            text: "+"
-                            Layout.preferredWidth: 40
-                            Layout.preferredHeight: 40
-                            implicitWidth: 40
-                            implicitHeight: 40
-                            enabled: root.nodeReady && topicInput.text.length > 0
-                            onClicked: root.addTopic(topicInput.text)
-                        }
+                    LogosText {
+                        text: root.events.length + " event" + (root.events.length === 1 ? "" : "s")
+                        font.pixelSize: Theme.typography.secondaryText
+                        color: Theme.palette.textSecondary
                     }
-
-                    // Full-width topic list. No horizontal margin — the highlight
-                    // rectangle spans the panel edges.
-                    ListView {
-                        id: topicListView
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        model: root.topicList
-                        clip: true
-                        spacing: 0
-
-                        delegate: Rectangle {
-                            width: ListView.view.width
-                            height: 40
-                            color: modelData === root.selectedTopic
-                                   ? Theme.palette.primary
-                                   : "transparent"
-
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: Theme.spacing.medium
-                                anchors.rightMargin: Theme.spacing.tiny
-                                spacing: Theme.spacing.tiny
-
-                                LogosText {
-                                    text: modelData
-                                    font.pixelSize: Theme.typography.primaryText
-                                    color: modelData === root.selectedTopic
-                                           ? Theme.palette.background
-                                           : Theme.palette.text
-                                    elide: Text.ElideMiddle
-                                    Layout.fillWidth: true
-
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: {
-                                            root.selectedTopic = modelData
-                                            eventView.model = root.eventsByTopic[modelData] || []
-                                        }
-                                    }
-                                }
-
-                                LogosButton {
-                                    text: "×"
-                                    implicitWidth: 28
-                                    implicitHeight: 28
-                                    Layout.preferredWidth: 28
-                                    Layout.preferredHeight: 28
-                                    onClicked: root.removeTopic(modelData)
-                                }
-                            }
-                        }
+                    InfoChip {
+                        tip: "<b>Event log</b> — every observed event in order, across all topics.<br><br>"
+                           + "<code>messageReceived</code> — a peer sent us a message.<br>"
+                           + "<code>messageSent</code> — our outgoing message was accepted by the local node.<br>"
+                           + "<code>messagePropagated</code> — the message was relayed to the network.<br>"
+                           + "<code>messageError</code> — the outgoing message failed.<br>"
+                           + "<code>subscribe()</code> / <code>unsubscribe()</code> / <code>send() returned</code> — "
+                           + "the immediate return value of the local API call (logged here so the demo is a faithful trace)."
                     }
+                }
+
+                ListView {
+                    id: eventView
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    clip: true
+                    spacing: Theme.spacing.tiny
+                    model: root.events
+                    delegate: MessageItem { evt: modelData }
                 }
             }
+        }
 
-            // ── Right: event log + send ──────────────────────────────────────
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                color: Theme.palette.backgroundSecondary
-                radius: Theme.spacing.radiusMedium
-                border.width: 1
-                border.color: Theme.palette.borderHairline
-                clip: true
+        // ─── Method-call playground ──────────────────────────────────────────
+        ColumnLayout {
+            Layout.fillWidth: true
+            spacing: Theme.spacing.small
 
-                ColumnLayout {
-                    anchors.fill: parent
-                    anchors.margins: Theme.spacing.medium
-                    spacing: Theme.spacing.small
+            MethodCall {
+                methodName: "subscribe"
+                arg1Name: "contentTopic"
+                callEnabled: root.nodeReady
+                infoTip: "<b>delivery_module.subscribe(contentTopic)</b><br><br>"
+                       + "Tell the node to listen for messages on a libp2p pubsub topic.<br>"
+                       + "Returns a <code>LogosResult</code>; on success the node will start emitting "
+                       + "<code>messageReceived</code> events for that topic."
+                onCall: function(arg1, _arg2) { root.callSubscribe(arg1) }
+            }
 
-                    RowLayout {
-                        Layout.fillWidth: true
-                        LogosText {
-                            text: root.selectedTopic.length > 0
-                                  ? root.selectedTopic
-                                  : "Select or add a content topic"
-                            font.pixelSize: Theme.typography.subtitleText
-                            font.weight: Theme.typography.weightBold
-                            elide: Text.ElideMiddle
-                            Layout.fillWidth: true
-                        }
-                        InfoChip {
-                            tip: "<b>Event log</b> — every observed event for the selected topic, in order.<br><br>"
-                               + "<code>messageReceived</code> — a peer sent us a message on this topic.<br>"
-                               + "<code>messageSent</code> — our outgoing message was accepted by the local node.<br>"
-                               + "<code>messagePropagated</code> — the message was relayed to the network.<br>"
-                               + "<code>messageError</code> — the outgoing message failed.<br>"
-                               + "<code>subscribe() returned</code> / <code>send() returned</code> — the immediate return value of the local API call."
-                        }
-                    }
+            MethodCall {
+                methodName: "unsubscribe"
+                arg1Name: "contentTopic"
+                callEnabled: root.nodeReady
+                infoTip: "<b>delivery_module.unsubscribe(contentTopic)</b><br><br>"
+                       + "Stop listening on the given topic. Returns a <code>LogosResult</code>."
+                onCall: function(arg1, _arg2) { root.callUnsubscribe(arg1) }
+            }
 
-                    ListView {
-                        id: eventView
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        clip: true
-                        spacing: Theme.spacing.tiny
-                        model: []
-                        delegate: MessageItem { evt: modelData }
-                    }
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: Theme.spacing.small
-
-                        LogosTextField {
-                            id: sendInput
-                            placeholderText: root.selectedTopic.length > 0
-                                             ? "Message to " + root.selectedTopic
-                                             : "Pick a topic first"
-                            Layout.fillWidth: true
-                            enabled: root.nodeReady && root.selectedTopic.length > 0
-                        }
-                        Connections {
-                            target: sendInput.textInput
-                            function onAccepted() { root.sendOutgoing(root.selectedTopic, sendInput.text) }
-                        }
-                        LogosButton {
-                            text: "Send"
-                            Layout.preferredWidth: 88
-                            Layout.preferredHeight: 40
-                            implicitWidth: 88
-                            implicitHeight: 40
-                            enabled: root.nodeReady
-                                     && root.selectedTopic.length > 0
-                                     && sendInput.text.length > 0
-                            onClicked: root.sendOutgoing(root.selectedTopic, sendInput.text)
-                        }
-                        InfoChip {
-                            tip: "<b>Send</b> calls <code>delivery_module.send(topic, text)</code>.<br><br>"
-                               + "On success the <code>LogosResult.getString()</code> value is the <b>request id</b>; "
-                               + "the <code>messageSent</code> and <code>messagePropagated</code> events arrive "
-                               + "asynchronously and carry the same request id."
-                        }
-                    }
-                }
+            MethodCall {
+                methodName: "send"
+                arg1Name: "contentTopic"
+                arg2Name: "payload"
+                callEnabled: root.nodeReady
+                infoTip: "<b>delivery_module.send(contentTopic, payload)</b><br><br>"
+                       + "Publish a message. The module base64-encodes the payload internally — "
+                       + "pass raw UTF-8 text.<br><br>"
+                       + "On success the <code>LogosResult.getString()</code> value is the <b>request id</b>; "
+                       + "the <code>messageSent</code> and <code>messagePropagated</code> events arrive "
+                       + "asynchronously and carry the same request id."
+                onCall: function(arg1, arg2) { root.callSend(arg1, arg2) }
             }
         }
     }
@@ -487,9 +339,9 @@ Item {
 
     // Multi-line tooltip with readable padding, primaryText size, RichText
     // formatting, and a backgroundElevated bubble that pops against the
-    // panels. Built from QtQuick.Controls.ToolTip — LogosToolTip's defaults
-    // (backgroundSecondary bubble, 60%-opacity bold-everywhere text, ~20px tall)
-    // are unreadable against backgroundSecondary panels.
+    // panels. Built directly on QtQuick.Controls.ToolTip — LogosToolTip's
+    // defaults (backgroundSecondary, 60%-opacity bold-everywhere text, ~20px
+    // tall) are unreadable against backgroundSecondary panels.
     component InfoTip: ToolTip {
         id: tip
 
@@ -504,7 +356,6 @@ Item {
             text: tip.text
             textFormat: Text.RichText
             wrapMode: Text.WordWrap
-            // Cap long tooltips at ~380px; short tips render at natural width.
             width: implicitWidth > 380 ? 380 : implicitWidth
             font.family: Theme.typography.publicSans
             font.pixelSize: Theme.typography.primaryText
@@ -521,6 +372,104 @@ Item {
         }
     }
 
+    // ── Method-call playground row ────────────────────────────────────────────
+    // Renders as:
+    //   methodName ( [arg1____], [arg2____] ) [Call] [?]
+    // arg2 is optional; if arg2Name is empty, only one field is shown.
+    component MethodCall: Rectangle {
+        id: mc
+
+        property string methodName: ""
+        property string arg1Name: ""
+        property string arg2Name: ""
+        property string infoTip: ""
+        property bool   callEnabled: true
+
+        signal call(string arg1, string arg2)
+
+        readonly property bool hasArg2: arg2Name.length > 0
+
+        Layout.fillWidth: true
+        Layout.preferredHeight: row.implicitHeight + Theme.spacing.medium * 2
+        color: Theme.palette.backgroundSecondary
+        radius: Theme.spacing.radiusMedium
+        border.width: 1
+        border.color: Theme.palette.borderHairline
+
+        function invoke() {
+            if (!mc.callEnabled) return
+            mc.call(arg1Field.text, mc.hasArg2 ? arg2Field.text : "")
+        }
+
+        RowLayout {
+            id: row
+            anchors.fill: parent
+            anchors.margins: Theme.spacing.medium
+            spacing: Theme.spacing.tiny
+
+            LogosText {
+                text: mc.methodName
+                font.family: "monospace"
+                font.pixelSize: Theme.typography.primaryText
+                font.weight: Theme.typography.weightBold
+                color: Theme.palette.primary
+            }
+            LogosText {
+                text: "("
+                font.family: "monospace"
+                font.pixelSize: Theme.typography.primaryText
+                color: Theme.palette.textSecondary
+            }
+            LogosTextField {
+                id: arg1Field
+                placeholderText: mc.arg1Name
+                Layout.fillWidth: true
+                Layout.minimumWidth: 100
+            }
+            Connections {
+                target: arg1Field.textInput
+                function onAccepted() { mc.invoke() }
+            }
+            LogosText {
+                visible: mc.hasArg2
+                text: ","
+                font.family: "monospace"
+                font.pixelSize: Theme.typography.primaryText
+                color: Theme.palette.textSecondary
+            }
+            LogosTextField {
+                id: arg2Field
+                visible: mc.hasArg2
+                placeholderText: mc.arg2Name
+                Layout.fillWidth: mc.hasArg2
+                Layout.minimumWidth: mc.hasArg2 ? 100 : 0
+            }
+            Connections {
+                target: arg2Field.textInput
+                enabled: mc.hasArg2
+                function onAccepted() { mc.invoke() }
+            }
+            LogosText {
+                text: ")"
+                font.family: "monospace"
+                font.pixelSize: Theme.typography.primaryText
+                color: Theme.palette.textSecondary
+            }
+            LogosButton {
+                text: "Call"
+                Layout.preferredWidth: 72
+                Layout.preferredHeight: 40
+                implicitWidth: 72
+                implicitHeight: 40
+                enabled: mc.callEnabled
+                         && arg1Field.text.length > 0
+                         && (!mc.hasArg2 || arg2Field.text.length > 0)
+                onClicked: mc.invoke()
+            }
+            InfoChip { tip: mc.infoTip }
+        }
+    }
+
     // Developer-facing event row. Renders every field of the event verbatim.
     component MessageItem: Rectangle {
         property var evt
@@ -532,6 +481,7 @@ Item {
                 case "messagePropagated":  return Theme.palette.success
                 case "messageError":       return Theme.palette.error
                 case "subscribe() returned":
+                case "unsubscribe() returned":
                 case "send() returned":    return Theme.palette.primary
             }
             return Theme.palette.textSecondary
@@ -545,7 +495,6 @@ Item {
         border.width: 1
         border.color: Theme.palette.borderHairline
 
-        // Left accent stripe colour-coded by event kind
         Rectangle {
             width: 3
             anchors.top: parent.top
