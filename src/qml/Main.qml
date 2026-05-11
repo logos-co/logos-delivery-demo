@@ -21,7 +21,6 @@ Item {
     readonly property bool   nodeReady:     backend ? backend.nodeReady       : false
     readonly property string peerIdValue:   backend ? backend.peerId          : ""
     readonly property int    peerCountValue: backend ? backend.peerCount      : 0
-    readonly property int    portsShiftValue: backend ? backend.portsShift    : 0
     readonly property string lastErrorValue: backend ? backend.lastError      : ""
 
     Connections {
@@ -176,10 +175,10 @@ Item {
                 anchors.margins: Theme.spacing.medium
                 spacing: Theme.spacing.small
 
-                // Row 1: title + badges
+                // Row 1: title + badges with adjacent info chips
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: Theme.spacing.large
+                    spacing: Theme.spacing.medium
 
                     LogosText {
                         text: "Logos Delivery demo"
@@ -197,16 +196,16 @@ Item {
                     LogosBadge {
                         text: "peers: " + root.peerCountValue
                         color: root.peerCountValue > 0 ? Theme.palette.success : Theme.palette.textSecondary
-
-                        HoverHandler { id: peersHover }
-                        ReadableToolTip {
-                            visible: peersHover.hovered
-                            text: "Polled from delivery_module.getNodeInfo(\"Metrics\") every 3s — parsed from the libp2p_peers gauge."
-                        }
+                    }
+                    InfoChip {
+                        tip: "<b>peers</b> — number of currently-connected libp2p peers.<br><br>"
+                           + "Polled every 3 seconds from "
+                           + "<code>delivery_module.getNodeInfo(\"Metrics\")</code> "
+                           + "and parsed out of the <code>libp2p_peers</code> Prometheus gauge."
                     }
                 }
 
-                // Row 2: Peer ID (own line, full id rendered as monospace text)
+                // Row 2: Peer ID (full id rendered as monospace text)
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: Theme.spacing.small
@@ -219,28 +218,16 @@ Item {
                     LogosText {
                         text: root.peerIdValue.length > 0
                               ? root.peerIdValue
-                              : "(not available yet — getNodeInfo(\"MyPeerId\"))"
+                              : "(not available yet)"
                         font.pixelSize: Theme.typography.primaryText
                         font.family: "monospace"
                         elide: Text.ElideMiddle
                         Layout.fillWidth: true
-
-                        HoverHandler { id: peerIdHover; enabled: root.peerIdValue.length > 0 }
-                        ReadableToolTip {
-                            visible: peerIdHover.hovered
-                            text: "delivery_module.getNodeInfo(\"MyPeerId\")"
-                        }
                     }
-                    LogosText {
-                        text: "portsShift: " + root.portsShiftValue
-                        font.pixelSize: Theme.typography.secondaryText
-                        color: Theme.palette.textSecondary
-
-                        HoverHandler { id: shiftHover }
-                        ReadableToolTip {
-                            visible: shiftHover.hovered
-                            text: "Hashed from LogosInstance::id() so two demo instances on one host don't collide on tcp/rest/metrics/discv5 ports."
-                        }
+                    InfoChip {
+                        tip: "<b>Peer ID</b> — this node's local libp2p peer identifier.<br><br>"
+                           + "Returned by <code>delivery_module.getNodeInfo(\"MyPeerId\")</code>, "
+                           + "polled every 3 seconds together with the peer count."
                     }
                 }
 
@@ -298,7 +285,10 @@ Item {
                             Layout.fillWidth: true
                         }
                         InfoChip {
-                            tip: "Add → delivery_module.subscribe(topic)\nRemove → delivery_module.unsubscribe(topic)\nBoth return LogosResult."
+                            tip: "<b>Content topics</b> — the libp2p pubsub topics this node is subscribed to.<br><br>"
+                               + "Adding a topic calls <code>delivery_module.subscribe(topic)</code>.<br>"
+                               + "Removing one calls <code>delivery_module.unsubscribe(topic)</code>.<br>"
+                               + "Both return a <code>LogosResult</code>; the demo logs the return value as a local event."
                         }
                     }
 
@@ -413,7 +403,12 @@ Item {
                             Layout.fillWidth: true
                         }
                         InfoChip {
-                            tip: "Every observed event is logged here verbatim — incoming messageReceived, outgoing messageSent / messagePropagated / messageError, and local subscribe()/send() return values."
+                            tip: "<b>Event log</b> — every observed event for the selected topic, in order.<br><br>"
+                               + "<code>messageReceived</code> — a peer sent us a message on this topic.<br>"
+                               + "<code>messageSent</code> — our outgoing message was accepted by the local node.<br>"
+                               + "<code>messagePropagated</code> — the message was relayed to the network.<br>"
+                               + "<code>messageError</code> — the outgoing message failed.<br>"
+                               + "<code>subscribe() returned</code> / <code>send() returned</code> — the immediate return value of the local API call."
                         }
                     }
 
@@ -455,7 +450,10 @@ Item {
                             onClicked: root.sendOutgoing(root.selectedTopic, sendInput.text)
                         }
                         InfoChip {
-                            tip: "Send calls delivery_module.send(topic, text). LogosResult.getString() is the request id. messageSent and messagePropagated events arrive asynchronously."
+                            tip: "<b>Send</b> calls <code>delivery_module.send(topic, text)</code>.<br><br>"
+                               + "On success the <code>LogosResult.getString()</code> value is the <b>request id</b>; "
+                               + "the <code>messageSent</code> and <code>messagePropagated</code> events arrive "
+                               + "asynchronously and carry the same request id."
                         }
                     }
                 }
@@ -481,18 +479,46 @@ Item {
             color: Theme.palette.textSecondary
         }
         HoverHandler { id: infoHover; cursorShape: Qt.PointingHandCursor }
-        ReadableToolTip {
+        InfoTip {
             visible: infoHover.hovered && tip.length > 0
             text: tip
         }
     }
 
-    // LogosToolTip's defaults (backgroundSecondary bubble + 60%-opacity text)
-    // are essentially invisible against this demo's backgroundSecondary panels.
-    // Override to backgroundElevated + full-opacity text for legibility.
-    component ReadableToolTip: LogosToolTip {
-        tipColor: Theme.palette.backgroundElevated
-        textColor: Theme.palette.text
+    // Multi-line tooltip with readable padding, primaryText size, RichText
+    // formatting, and a backgroundElevated bubble that pops against the
+    // panels. Built from QtQuick.Controls.ToolTip — LogosToolTip's defaults
+    // (backgroundSecondary bubble, 60%-opacity bold-everywhere text, ~20px tall)
+    // are unreadable against backgroundSecondary panels.
+    component InfoTip: ToolTip {
+        id: tip
+
+        delay: 200
+        timeout: 12000
+        leftPadding: Theme.spacing.medium
+        rightPadding: Theme.spacing.medium
+        topPadding: Theme.spacing.small
+        bottomPadding: Theme.spacing.small
+
+        contentItem: Text {
+            text: tip.text
+            textFormat: Text.RichText
+            wrapMode: Text.WordWrap
+            // Cap long tooltips at ~380px; short tips render at natural width.
+            width: implicitWidth > 380 ? 380 : implicitWidth
+            font.family: Theme.typography.publicSans
+            font.pixelSize: Theme.typography.primaryText
+            font.weight: Theme.typography.weightRegular
+            color: Theme.palette.text
+            lineHeight: 1.35
+        }
+
+        background: Rectangle {
+            color: Theme.palette.backgroundElevated
+            radius: Theme.spacing.radiusSmall
+            border.width: 1
+            border.color: Theme.palette.border
+        }
     }
 
     // Developer-facing event row. Renders every field of the event verbatim.
