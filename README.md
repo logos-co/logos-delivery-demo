@@ -77,6 +77,21 @@ The C++ backend lives in the `ui-host` process; the QML view runs in the host ap
 
 The demo hardcodes the **`logos.dev`** preset for the underlying `createNode` call. Configuration is intentionally not exposed in the UI — the goal is to show the `delivery_module` API surface, not act as a general-purpose chat client.
 
+### Running multiple instances on one machine
+
+You can run two (or more) demo instances side-by-side and watch them message each other. Each instance picks a unique port window automatically:
+
+- Each host process (`nix run`, `logos-basecamp`, `logoscore`) gets a unique `LOGOS_INSTANCE_ID` at startup via `LogosInstance::id()`, scoping every Logos-platform unix socket (token exchange, Qt Remote Objects, …).
+- The demo additionally hashes that instance ID into a **`portsShift`** value passed to `createNode`. WakuNodeConf's `portsShift` offsets *all* listener ports (TCP, REST, metrics, discv5 UDP, websocket) by the same amount, so two instances can't collide on the underlying waku ports either.
+
+Just run `nix run` twice in separate terminals — subscribe both to the same content topic, send from one, and the other should fire `messageReceived`.
+
+The shift is logged on startup, e.g.:
+
+```
+logos_delivery_demo: createNode portsShift= 2317 instanceId= "9f3a1c5b6e80"
+```
+
 ## References
 
 - [Journey doc — Use the Logos Delivery module API from an app](https://github.com/logos-co/logos-docs/blob/main/docs/messaging/journeys/use-the-logos-delivery-module-api-from-an-app.md)

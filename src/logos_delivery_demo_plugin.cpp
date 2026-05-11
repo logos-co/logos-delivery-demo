@@ -2,8 +2,12 @@
 #include "logos_api.h"
 #include "logos_sdk.h"
 #include "logos_types.h"
+#include "logos_instance.h"
 
 #include <QDebug>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QRandomGenerator>
 
 LogosDeliveryDemoPlugin::LogosDeliveryDemoPlugin(QObject* parent)
     : LogosDeliveryDemoSimpleSource(parent)
@@ -61,9 +65,27 @@ void LogosDeliveryDemoPlugin::wireEvents()
 
 void LogosDeliveryDemoPlugin::bootstrapNode()
 {
-    const QString cfg = QStringLiteral(R"({"logLevel":"INFO","mode":"Core","preset":"logos.dev"})");
+    // Derive a unique port window per Logos instance so two demo instances
+    // on one machine don't collide on tcp/rest/metrics/discv5/websocket ports.
+    // LogosInstance::id() is provisioned by logos_core_start() / logoscore
+    // and inherited via LOGOS_INSTANCE_ID; child processes see the same id.
+    const QString instanceId = LogosInstance::id();
+    bool ok = false;
+    const uint hex = instanceId.left(4).toUInt(&ok, 16);
+    const int portsShift = static_cast<int>(
+        100 + ((ok ? hex : QRandomGenerator::global()->generate()) % 4500));
 
-    LogosResult create = m_logos->delivery_module.createNode(cfg);
+    QJsonObject cfg{
+        {"logLevel", "INFO"},
+        {"mode", "Core"},
+        {"preset", "logos.dev"},
+        {"portsShift", portsShift}
+    };
+    const QString cfgJson = QString::fromUtf8(QJsonDocument(cfg).toJson(QJsonDocument::Compact));
+    qInfo() << "logos_delivery_demo: createNode portsShift=" << portsShift
+            << "instanceId=" << instanceId;
+
+    LogosResult create = m_logos->delivery_module.createNode(cfgJson);
     if (!create.success) {
         setLastError(QStringLiteral("createNode failed: %1").arg(create.getError()));
         return;
