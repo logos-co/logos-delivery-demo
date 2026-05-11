@@ -6,34 +6,19 @@ This repo is the runnable companion to the journey doc [**Use the Logos Delivery
 
 Pinned to `logos-delivery-module` [**`v0.1.1`**](https://github.com/logos-co/logos-delivery-module/tree/v0.1.1).
 
+![Screenshot of the demo running on logos.dev](docs/screenshot.png)
+
 ## What it shows
 
 - Declaring `delivery_module` as a Logos module dependency (in `metadata.json` and `flake.nix`)
 - Constructing the typed `LogosModules` wrapper from `LogosAPI*` in `initLogos`
 - Bootstrapping the node with `createNode(...)` and `start()`, with `LogosResult` checks
-- Subscribing to user-managed [LIP-23](https://lip.logos.co/messaging/informational/23/topics.html) content topics
-- Sending raw-text messages and tracking their lifecycle through `messageSent` → `messagePropagated` (or `messageError`), surfaced as an inline status glyph next to each outgoing message
-- Decoding incoming `messageReceived` events (payload arrives base64-encoded)
-- Surfacing `connectionStateChanged` as a live health indicator
 - Polling `delivery_module.getNodeInfo(...)` for my peer ID (`MyPeerId`) and peer count (parsed from the `Metrics` Prometheus text, `libp2p_peers` gauge) every 3s
+- Surfacing `connectionStateChanged` as a live status badge
+- A **global event log** that renders every observed event verbatim — `messageReceived`, `messageSent`, `messagePropagated`, `messageError`, plus the local return values of `subscribe()` / `unsubscribe()` / `send()` — colour-coded by event kind, with every field selectable so you can copy hashes, topics, payloads, request ids
+- A **method-call playground** at the bottom: one row per public `delivery_module` API call (`subscribe`, `unsubscribe`, `send`), rendered as `methodName(arg…)` with a `Call` button — every interaction is reflected as a row in the event log above
+- An info `?` chip next to every interactive element with a tooltip spelling out the exact `delivery_module` call behind it — the demo doubles as live API documentation
 - Using **[`Logos.Theme`](https://github.com/logos-co/logos-design-system) and `Logos.Controls`** for tokens, colors, and themed components — no hard-coded styling in the demo
-
-## UI
-
-```
-┌──────────────────────────────────────────────────────────┐
-│ Logos Delivery demo     ● node: <connection status>  [?] │
-├──────────────────┬───────────────────────────────────────┤
-│ Content topics   │ /selected/topic                    [?]│
-│ ┌──────────┐ [+] │ ┌─────────────────────────────────┐   │
-│ │ /a/1/x   │     │ │ ← incoming                      │   │
-│ │ /a/1/y × │     │ │   outgoing →     ✓✓ propagated  │   │
-│ └──────────┘     │ └─────────────────────────────────┘   │
-│              [?] │ [message…              ] [Send] [?]   │
-└──────────────────┴───────────────────────────────────────┘
-```
-
-The `[?]` buttons are tooltips spelling out the exact `delivery_module` method behind each control — the demo doubles as live API documentation.
 
 ## Build & run
 
