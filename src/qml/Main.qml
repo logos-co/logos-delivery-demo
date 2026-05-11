@@ -287,7 +287,10 @@ Item {
                             id: topicInput
                             placeholderText: "/myapp/1/chat/proto"
                             Layout.fillWidth: true
-                            onAccepted: root.addTopic(text)
+                        }
+                        Connections {
+                            target: topicInput.textInput
+                            function onAccepted() { root.addTopic(topicInput.text) }
                         }
                         LogosButton {
                             text: "+"
@@ -396,7 +399,10 @@ Item {
                                              : "Pick a topic first"
                             Layout.fillWidth: true
                             enabled: root.nodeReady && root.selectedTopic.length > 0
-                            onAccepted: root.sendOutgoing(root.selectedTopic, text)
+                        }
+                        Connections {
+                            target: sendInput.textInput
+                            function onAccepted() { root.sendOutgoing(root.selectedTopic, sendInput.text) }
                         }
                         LogosButton {
                             text: "Send"
