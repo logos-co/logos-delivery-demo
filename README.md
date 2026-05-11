@@ -12,9 +12,11 @@ Pinned to `logos-delivery-module` [**`v0.1.1`**](https://github.com/logos-co/log
 - Constructing the typed `LogosModules` wrapper from `LogosAPI*` in `initLogos`
 - Bootstrapping the node with `createNode(...)` and `start()`, with `LogosResult` checks
 - Subscribing to user-managed [LIP-23](https://lip.logos.co/messaging/informational/23/topics.html) content topics
-- Sending raw-text messages and tracking their lifecycle through `messageSent` → `messagePropagated` (or `messageError`)
+- Sending raw-text messages and tracking their lifecycle through `messageSent` → `messagePropagated` (or `messageError`), surfaced as an inline status glyph next to each outgoing message
 - Decoding incoming `messageReceived` events (payload arrives base64-encoded)
 - Surfacing `connectionStateChanged` as a live health indicator
+- Polling `delivery_module.getNodeInfo(...)` for my peer ID (`MyPeerId`) and peer count (parsed from the `Metrics` Prometheus text, `libp2p_peers` gauge) every 3s
+- Using **[`Logos.Theme`](https://github.com/logos-co/logos-design-system) and `Logos.Controls`** for tokens, colors, and themed components — no hard-coded styling in the demo
 
 ## UI
 

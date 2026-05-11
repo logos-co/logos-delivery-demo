@@ -8,6 +8,8 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QRandomGenerator>
+#include <QRegularExpression>
+#include <QTimer>
 
 LogosDeliveryDemoPlugin::LogosDeliveryDemoPlugin(QObject* parent)
     : LogosDeliveryDemoSimpleSource(parent)
@@ -84,6 +86,7 @@ void LogosDeliveryDemoPlugin::bootstrapNode()
     const QString cfgJson = QString::fromUtf8(QJsonDocument(cfg).toJson(QJsonDocument::Compact));
     qInfo() << "logos_delivery_demo: createNode portsShift=" << portsShift
             << "instanceId=" << instanceId;
+    setPortsShift(portsShift);
 
     LogosResult create = m_logos->delivery_module.createNode(cfgJson);
     if (!create.success) {
@@ -98,6 +101,37 @@ void LogosDeliveryDemoPlugin::bootstrapNode()
     }
 
     setNodeReady(true);
+
+    // Poll node info (peer id, peer count) every 3s — the module only exposes
+    // them via getNodeInfo, so we surface them to QML as auto-synced PROPs.
+    m_pollTimer = new QTimer(this);
+    m_pollTimer->setInterval(3000);
+    QObject::connect(m_pollTimer, &QTimer::timeout, this, &LogosDeliveryDemoPlugin::refreshNodeInfo);
+    refreshNodeInfo();
+    m_pollTimer->start();
+}
+
+void LogosDeliveryDemoPlugin::refreshNodeInfo()
+{
+    if (!m_logos) return;
+
+    LogosResult peer = m_logos->delivery_module.getNodeInfo(QStringLiteral("MyPeerId"));
+    if (peer.success) {
+        setPeerId(peer.getString());
+    }
+
+    LogosResult metrics = m_logos->delivery_module.getNodeInfo(QStringLiteral("Metrics"));
+    if (metrics.success) {
+        // The Metrics endpoint returns Prometheus text. Grep `libp2p_peers <n>`
+        // — it's the only widely-supported peer-count gauge in libp2p.
+        const QString body = metrics.getString();
+        static const QRegularExpression rx(QStringLiteral("^libp2p_peers\\s+(\\d+)"),
+                                            QRegularExpression::MultilineOption);
+        const QRegularExpressionMatch m = rx.match(body);
+        if (m.hasMatch()) {
+            setPeerCount(m.captured(1).toInt());
+        }
+    }
 }
 
 QString LogosDeliveryDemoPlugin::subscribe(QString topic)

@@ -2,6 +2,9 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
+import Logos.Theme
+import Logos.Controls
+
 Item {
     id: root
 
@@ -9,12 +12,16 @@ Item {
 
     // QML-side state — single source of truth for the UI.
     // The backend forwards delivery_module events into this model.
-    property var topics: ({})         // { topic: [ {direction, text, hash, requestId, ts, propagated, error} ] }
-    property var topicList: []        // ordered list of subscribed topics
+    property var topics: ({})       // { topic: [ {direction, text, hash, requestId, ts, state} ] }
+    property var topicList: []      // ordered list of subscribed topics
     property string selectedTopic: ""
-    property string nodeStatus: backend ? backend.connectionStatus : "no backend"
-    property bool nodeReady: backend ? backend.nodeReady : false
-    property string lastError: backend ? backend.lastError : ""
+
+    readonly property string nodeStatus: backend ? backend.connectionStatus : "no backend"
+    readonly property bool   nodeReady:  backend ? backend.nodeReady       : false
+    readonly property string peerIdValue: backend ? backend.peerId          : ""
+    readonly property int    peerCountValue: backend ? backend.peerCount    : 0
+    readonly property int    portsShiftValue: backend ? backend.portsShift  : 0
+    readonly property string lastErrorValue: backend ? backend.lastError    : ""
 
     Connections {
         target: backend
@@ -25,20 +32,21 @@ Item {
                 direction: "in",
                 text: Qt.atob(payloadBase64),
                 hash: messageHash,
-                ts: timestamp
+                ts: timestamp,
+                state: "received"
             })
         }
 
         function onMessageSentNotif(requestId, messageHash) {
-            root.updateOutgoing(requestId, { hash: messageHash, sent: true })
+            root.updateOutgoing(requestId, { hash: messageHash, state: "sent" })
         }
 
         function onMessagePropagatedNotif(requestId, messageHash) {
-            root.updateOutgoing(requestId, { hash: messageHash, propagated: true })
+            root.updateOutgoing(requestId, { hash: messageHash, state: "propagated" })
         }
 
         function onMessageErrorNotif(requestId, errorText) {
-            root.updateOutgoing(requestId, { error: errorText })
+            root.updateOutgoing(requestId, { state: "error", errorText: errorText })
         }
     }
 
@@ -52,13 +60,10 @@ Item {
     }
 
     function updateOutgoing(requestId, patch) {
-        // Walk all topics looking for an entry with this requestId.
         const next = Object.assign({}, root.topics)
         for (const t in next) {
             for (const m of next[t]) {
-                if (m.requestId === requestId) {
-                    Object.assign(m, patch)
-                }
+                if (m.requestId === requestId) Object.assign(m, patch)
             }
         }
         root.topics = next
@@ -75,10 +80,7 @@ Item {
         }
         logos.watch(backend.subscribe(trimmed),
             function(err) {
-                if (err && err.length > 0) {
-                    root.lastError = "subscribe failed: " + err
-                    return
-                }
+                if (err && err.length > 0) return
                 root.topicList = root.topicList.concat([trimmed])
                 const copy = Object.assign({}, root.topics)
                 copy[trimmed] = []
@@ -87,7 +89,7 @@ Item {
                 messageView.model = copy[trimmed]
                 topicInput.text = ""
             },
-            function(err) { root.lastError = String(err) }
+            function(_e) {}
         )
     }
 
@@ -95,10 +97,7 @@ Item {
         if (!topic) return
         logos.watch(backend.unsubscribe(topic),
             function(err) {
-                if (err && err.length > 0) {
-                    root.lastError = "unsubscribe failed: " + err
-                    return
-                }
+                if (err && err.length > 0) return
                 root.topicList = root.topicList.filter(function(t) { return t !== topic })
                 const copy = Object.assign({}, root.topics)
                 delete copy[topic]
@@ -108,119 +107,193 @@ Item {
                     messageView.model = root.selectedTopic ? (copy[root.selectedTopic] || []) : []
                 }
             },
-            function(err) { root.lastError = String(err) }
+            function(_e) {}
         )
     }
 
-    function sendMessage(topic, text) {
+    function sendOutgoing(topic, text) {
         if (!topic || !text) return
         logos.watch(backend.sendMessage(topic, text),
             function(requestId) {
-                if (!requestId || requestId.length === 0) return  // setLastError on backend already populated
+                if (!requestId || requestId.length === 0) return
                 root.appendMessage(topic, {
                     direction: "out",
                     text: text,
                     requestId: requestId,
-                    sent: false,
-                    propagated: false,
-                    error: "",
+                    state: "pending",
                     ts: ""
                 })
                 sendInput.text = ""
             },
-            function(err) { root.lastError = String(err) }
+            function(_e) {}
         )
     }
 
     // ─── Layout ────────────────────────────────────────────────────────────────
 
+    Rectangle {
+        anchors.fill: parent
+        color: Theme.palette.background
+    }
+
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: 12
-        spacing: 8
+        anchors.margins: Theme.spacing.small
+        spacing: Theme.spacing.small
 
-        // Header / health
+        // ── Header / health bar
         Rectangle {
             Layout.fillWidth: true
-            height: 56
-            color: "#1f1f2a"
-            radius: 8
+            Layout.preferredHeight: 64
+            color: Theme.palette.backgroundSecondary
+            radius: Theme.spacing.radiusMedium
+            border.width: 1
+            border.color: Theme.palette.borderHairline
 
             RowLayout {
                 anchors.fill: parent
-                anchors.margins: 12
-                spacing: 12
+                anchors.leftMargin: Theme.spacing.medium
+                anchors.rightMargin: Theme.spacing.medium
+                spacing: Theme.spacing.medium
 
-                Text {
+                LogosText {
                     text: "Logos Delivery demo"
-                    color: "#ffffff"
-                    font.pixelSize: 16
-                    font.bold: true
+                    font.pixelSize: Theme.typography.panelTitleText
+                    font.weight: Theme.typography.weightBold
                 }
 
                 Item { Layout.fillWidth: true }
 
+                // Connection status pill
                 Rectangle {
-                    width: 10; height: 10; radius: 5
-                    color: root.nodeReady ? "#56d364" : "#f0a623"
+                    Layout.preferredHeight: 24
+                    Layout.preferredWidth: statusRow.implicitWidth + Theme.spacing.medium
+                    radius: Theme.spacing.radiusPill
+                    color: Theme.palette.backgroundElevated
+                    border.width: 1
+                    border.color: root.nodeReady ? Theme.palette.success : Theme.palette.warning
+
+                    RowLayout {
+                        id: statusRow
+                        anchors.centerIn: parent
+                        spacing: Theme.spacing.small
+
+                        Rectangle {
+                            width: 8; height: 8; radius: 4
+                            color: root.nodeReady ? Theme.palette.success : Theme.palette.warning
+                        }
+                        LogosText {
+                            text: root.nodeReady ? root.nodeStatus : "starting…"
+                            font.pixelSize: Theme.typography.secondaryText
+                            color: Theme.palette.textSecondary
+                        }
+                    }
                 }
 
-                Text {
-                    text: "node: " + root.nodeStatus
-                    color: "#c0c0c0"
-                    font.pixelSize: 13
-                }
+                // Peers count pill
+                Rectangle {
+                    Layout.preferredHeight: 24
+                    Layout.preferredWidth: peersRow.implicitWidth + Theme.spacing.medium
+                    radius: Theme.spacing.radiusPill
+                    color: Theme.palette.backgroundElevated
+                    border.width: 1
+                    border.color: Theme.palette.borderHairline
 
-                Button {
-                    text: "?"
-                    implicitWidth: 28
-                    ToolTip.visible: hovered
+                    ToolTip.visible: peerArea.containsMouse
                     ToolTip.delay: 200
-                    ToolTip.text: "On load, the backend calls:\n  delivery_module.createNode({preset:'logos.dev', mode:'Core'})\n  delivery_module.start()\nand listens for connectionStateChanged events."
+                    ToolTip.text: "Polled from delivery_module.getNodeInfo(\"Metrics\") every 3s — parsed from the libp2p_peers gauge."
+
+                    MouseArea { id: peerArea; anchors.fill: parent; hoverEnabled: true }
+
+                    RowLayout {
+                        id: peersRow
+                        anchors.centerIn: parent
+                        spacing: Theme.spacing.small
+                        LogosText {
+                            text: "peers " + root.peerCountValue
+                            font.pixelSize: Theme.typography.secondaryText
+                            color: Theme.palette.textSecondary
+                        }
+                    }
+                }
+
+                // Peer ID pill (truncated, click to copy is left for the user to add)
+                Rectangle {
+                    Layout.preferredHeight: 24
+                    Layout.preferredWidth: idRow.implicitWidth + Theme.spacing.medium
+                    visible: root.peerIdValue.length > 0
+                    radius: Theme.spacing.radiusPill
+                    color: Theme.palette.backgroundElevated
+                    border.width: 1
+                    border.color: Theme.palette.borderHairline
+
+                    ToolTip.visible: idArea.containsMouse
+                    ToolTip.delay: 200
+                    ToolTip.text: "My peer ID (delivery_module.getNodeInfo(\"MyPeerId\")):\n" + root.peerIdValue +
+                                  "\n\nPort shift this instance: " + root.portsShiftValue +
+                                  " (derived from LogosInstance::id so two instances on one host don't collide)."
+
+                    MouseArea { id: idArea; anchors.fill: parent; hoverEnabled: true }
+
+                    RowLayout {
+                        id: idRow
+                        anchors.centerIn: parent
+                        spacing: Theme.spacing.small
+                        LogosText {
+                            text: "me " + root.peerIdValue.slice(0, 6) + "…" + root.peerIdValue.slice(-4)
+                            font.pixelSize: Theme.typography.secondaryText
+                            color: Theme.palette.textSecondary
+                            font.family: "monospace"
+                        }
+                    }
                 }
             }
         }
 
-        // Body
+        // ── Body
         RowLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            spacing: 8
+            spacing: Theme.spacing.small
 
-            // ── Left: topics
+            // ─── Left: topics
             Rectangle {
-                Layout.preferredWidth: 240
+                Layout.preferredWidth: 260
                 Layout.fillHeight: true
-                color: "#181821"
-                radius: 8
+                color: Theme.palette.backgroundSecondary
+                radius: Theme.spacing.radiusMedium
+                border.width: 1
+                border.color: Theme.palette.borderHairline
 
                 ColumnLayout {
                     anchors.fill: parent
-                    anchors.margins: 10
-                    spacing: 8
+                    anchors.margins: Theme.spacing.small
+                    spacing: Theme.spacing.small
 
                     RowLayout {
-                        Text { text: "Content topics"; color: "#ffffff"; font.bold: true; font.pixelSize: 14 }
-                        Item { Layout.fillWidth: true }
-                        Button {
-                            text: "?"
-                            implicitWidth: 24
-                            ToolTip.visible: hovered
-                            ToolTip.delay: 200
-                            ToolTip.text: "Each subscription calls delivery_module.subscribe(topic). Removing it calls delivery_module.unsubscribe(topic). Both return LogosResult."
+                        LogosText {
+                            text: "Content topics"
+                            font.pixelSize: Theme.typography.subtitleText
+                            font.weight: Theme.typography.weightBold
+                            Layout.fillWidth: true
+                        }
+                        InfoChip {
+                            tip: "Add → delivery_module.subscribe(topic)\nRemove → delivery_module.unsubscribe(topic)\nBoth return LogosResult."
                         }
                     }
 
                     RowLayout {
-                        TextField {
+                        LogosTextField {
                             id: topicInput
                             placeholderText: "/myapp/1/chat/proto"
                             Layout.fillWidth: true
                             onAccepted: root.addTopic(text)
                         }
-                        Button {
+                        LogosButton {
                             text: "+"
-                            enabled: root.nodeReady
+                            implicitWidth: 40
+                            implicitHeight: 40
+                            enabled: root.nodeReady && topicInput.text.length > 0
                             onClicked: root.addTopic(topicInput.text)
                         }
                     }
@@ -236,23 +309,26 @@ Item {
                         delegate: Rectangle {
                             width: ListView.view.width
                             height: 36
-                            color: modelData === root.selectedTopic ? "#2d3242" : "transparent"
-                            radius: 4
+                            color: modelData === root.selectedTopic
+                                   ? Theme.palette.backgroundElevated
+                                   : "transparent"
+                            radius: Theme.spacing.radiusSmall
 
                             RowLayout {
                                 anchors.fill: parent
-                                anchors.margins: 6
-                                spacing: 6
+                                anchors.leftMargin: Theme.spacing.small
+                                anchors.rightMargin: Theme.spacing.tiny
+                                spacing: Theme.spacing.tiny
 
-                                Text {
+                                LogosText {
                                     text: modelData
-                                    color: "#e8e8e8"
-                                    font.pixelSize: 12
+                                    font.pixelSize: Theme.typography.secondaryText
                                     elide: Text.ElideMiddle
                                     Layout.fillWidth: true
 
                                     MouseArea {
                                         anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
                                         onClicked: {
                                             root.selectedTopic = modelData
                                             messageView.model = root.topics[modelData] || []
@@ -260,9 +336,10 @@ Item {
                                     }
                                 }
 
-                                Button {
+                                LogosButton {
                                     text: "×"
-                                    implicitWidth: 24
+                                    implicitWidth: 28
+                                    implicitHeight: 28
                                     onClicked: root.removeTopic(modelData)
                                 }
                             }
@@ -271,33 +348,32 @@ Item {
                 }
             }
 
-            // ── Right: messages + send
+            // ─── Right: conversation
             Rectangle {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                color: "#181821"
-                radius: 8
+                color: Theme.palette.backgroundSecondary
+                radius: Theme.spacing.radiusMedium
+                border.width: 1
+                border.color: Theme.palette.borderHairline
 
                 ColumnLayout {
                     anchors.fill: parent
-                    anchors.margins: 10
-                    spacing: 8
+                    anchors.margins: Theme.spacing.small
+                    spacing: Theme.spacing.small
 
                     RowLayout {
-                        Text {
-                            text: root.selectedTopic.length > 0 ? root.selectedTopic : "Select or add a topic"
-                            color: "#ffffff"
-                            font.bold: true
-                            font.pixelSize: 14
+                        LogosText {
+                            text: root.selectedTopic.length > 0
+                                  ? root.selectedTopic
+                                  : "Select or add a content topic"
+                            font.pixelSize: Theme.typography.subtitleText
+                            font.weight: Theme.typography.weightBold
                             elide: Text.ElideMiddle
                             Layout.fillWidth: true
                         }
-                        Button {
-                            text: "?"
-                            implicitWidth: 24
-                            ToolTip.visible: hovered
-                            ToolTip.delay: 200
-                            ToolTip.text: "Incoming messages are delivered via the messageReceived event on delivery_module. Payloads arrive base64-encoded; the demo decodes them with Qt.atob()."
+                        InfoChip {
+                            tip: "Incoming messages arrive via the messageReceived event.\nPayload is base64; the demo decodes it with Qt.atob()."
                         }
                     }
 
@@ -306,91 +382,146 @@ Item {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         clip: true
-                        spacing: 4
+                        spacing: Theme.spacing.tiny
                         model: []
 
-                        delegate: Rectangle {
-                            width: ListView.view.width
-                            height: msgCol.implicitHeight + 12
-                            radius: 6
-                            color: modelData.direction === "out" ? "#1d3559" : "#262633"
-
-                            ColumnLayout {
-                                id: msgCol
-                                anchors.left: parent.left
-                                anchors.right: parent.right
-                                anchors.verticalCenter: parent.verticalCenter
-                                anchors.margins: 6
-                                spacing: 2
-
-                                Text {
-                                    text: modelData.text
-                                    color: "#e8e8e8"
-                                    font.pixelSize: 13
-                                    wrapMode: Text.WrapAnywhere
-                                    Layout.fillWidth: true
-                                }
-
-                                Text {
-                                    visible: modelData.direction === "out"
-                                    text: {
-                                        if (modelData.error)        return "✕ " + modelData.error
-                                        if (modelData.propagated)   return "✓✓ propagated  " + (modelData.hash || "")
-                                        if (modelData.sent)         return "✓  sent  " + (modelData.hash || "")
-                                        return "… awaiting confirmation"
-                                    }
-                                    color: modelData.error ? "#f85149" : "#8b949e"
-                                    font.pixelSize: 11
-                                }
-
-                                Text {
-                                    visible: modelData.direction === "in"
-                                    text: "hash: " + (modelData.hash || "")
-                                    color: "#8b949e"
-                                    font.pixelSize: 11
-                                    elide: Text.ElideRight
-                                    Layout.fillWidth: true
-                                }
-                            }
-                        }
+                        delegate: MessageBubble { msg: modelData }
                     }
 
                     RowLayout {
-                        TextField {
+                        LogosTextField {
                             id: sendInput
-                            placeholderText: root.selectedTopic.length > 0 ? "Message to " + root.selectedTopic : "Pick a topic first"
+                            placeholderText: root.selectedTopic.length > 0
+                                             ? "Message to " + root.selectedTopic
+                                             : "Pick a topic first"
                             Layout.fillWidth: true
                             enabled: root.nodeReady && root.selectedTopic.length > 0
-                            onAccepted: root.sendMessage(root.selectedTopic, text)
+                            onAccepted: root.sendOutgoing(root.selectedTopic, text)
                         }
-                        Button {
+                        LogosButton {
                             text: "Send"
-                            enabled: root.nodeReady && root.selectedTopic.length > 0 && sendInput.text.length > 0
-                            onClicked: root.sendMessage(root.selectedTopic, sendInput.text)
+                            enabled: root.nodeReady
+                                     && root.selectedTopic.length > 0
+                                     && sendInput.text.length > 0
+                            onClicked: root.sendOutgoing(root.selectedTopic, sendInput.text)
                         }
-                        Button {
-                            text: "?"
-                            implicitWidth: 24
-                            ToolTip.visible: hovered
-                            ToolTip.delay: 200
-                            ToolTip.text: "Send calls delivery_module.send(topic, text). LogosResult.getString() returns a request ID; messageSent then messagePropagated events arrive asynchronously for that request ID."
+                        InfoChip {
+                            tip: "Send calls delivery_module.send(topic, text). The module base64-encodes for you. LogosResult.getString() is the request id; track it via messageSent → messagePropagated (or messageError)."
                         }
                     }
 
                     Rectangle {
-                        visible: root.lastError.length > 0
+                        visible: root.lastErrorValue.length > 0
                         Layout.fillWidth: true
-                        height: 32
-                        radius: 4
-                        color: "#3d1a1a"
-                        Text {
-                            anchors.centerIn: parent
-                            text: root.lastError
-                            color: "#f85149"
-                            font.pixelSize: 12
+                        Layout.preferredHeight: 28
+                        radius: Theme.spacing.radiusSmall
+                        color: Qt.rgba(Theme.palette.error.r, Theme.palette.error.g, Theme.palette.error.b, 0.15)
+                        border.width: 1
+                        border.color: Theme.palette.error
+                        LogosText {
+                            anchors.fill: parent
+                            anchors.leftMargin: Theme.spacing.small
+                            verticalAlignment: Text.AlignVCenter
+                            text: root.lastErrorValue
+                            color: Theme.palette.error
+                            font.pixelSize: Theme.typography.secondaryText
                         }
                     }
                 }
+            }
+        }
+    }
+
+    // ── Reusable inline components ────────────────────────────────────────────
+
+    component InfoChip: Rectangle {
+        property string tip: ""
+        implicitWidth: 22
+        implicitHeight: 22
+        radius: 11
+        color: Theme.palette.backgroundElevated
+        border.width: 1
+        border.color: Theme.palette.borderHairline
+
+        ToolTip.visible: infoArea.containsMouse && tip.length > 0
+        ToolTip.delay: 200
+        ToolTip.text: tip
+
+        LogosText {
+            anchors.centerIn: parent
+            text: "?"
+            font.pixelSize: Theme.typography.secondaryText
+            color: Theme.palette.textSecondary
+        }
+        MouseArea {
+            id: infoArea
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+        }
+    }
+
+    component MessageBubble: Rectangle {
+        property var msg
+        readonly property bool outgoing: msg && msg.direction === "out"
+        readonly property string stateGlyph: {
+            if (!msg) return ""
+            switch (msg.state) {
+                case "error":      return "✕"
+                case "propagated": return "✓✓"
+                case "sent":       return "✓"
+                case "pending":    return "…"
+                case "received":   return ""   // incoming: no glyph
+                default:           return ""
+            }
+        }
+        readonly property color stateColor: {
+            if (msg && msg.state === "error")      return Theme.palette.error
+            if (msg && msg.state === "propagated") return Theme.palette.success
+            return Theme.palette.textSecondary
+        }
+
+        width: ListView.view ? ListView.view.width : implicitWidth
+        height: msgRow.implicitHeight + Theme.spacing.small * 2
+        radius: Theme.spacing.radiusMedium
+        color: outgoing ? Theme.palette.surface : Theme.palette.backgroundElevated
+        border.width: 1
+        border.color: Theme.palette.borderHairline
+
+        ToolTip.visible: bubbleArea.containsMouse && msg && (msg.hash || msg.requestId || msg.errorText)
+        ToolTip.delay: 400
+        ToolTip.text: {
+            if (!msg) return ""
+            const parts = []
+            if (msg.hash)       parts.push("hash: " + msg.hash)
+            if (msg.requestId)  parts.push("requestId: " + msg.requestId)
+            if (msg.errorText)  parts.push("error: " + msg.errorText)
+            if (msg.ts)         parts.push("ts: " + msg.ts)
+            return parts.join("\n")
+        }
+
+        MouseArea { id: bubbleArea; anchors.fill: parent; hoverEnabled: true }
+
+        RowLayout {
+            id: msgRow
+            anchors.fill: parent
+            anchors.leftMargin: Theme.spacing.medium
+            anchors.rightMargin: Theme.spacing.medium
+            anchors.topMargin: Theme.spacing.small
+            anchors.bottomMargin: Theme.spacing.small
+            spacing: Theme.spacing.small
+
+            LogosText {
+                text: msg ? msg.text : ""
+                wrapMode: Text.WrapAnywhere
+                Layout.fillWidth: true
+            }
+
+            LogosText {
+                visible: stateGlyph.length > 0
+                text: stateGlyph
+                color: stateColor
+                font.pixelSize: Theme.typography.secondaryText
             }
         }
     }

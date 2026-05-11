@@ -9,6 +9,7 @@
 
 class LogosAPI;
 class LogosModules;
+class QTimer;
 
 class LogosDeliveryDemoPlugin : public LogosDeliveryDemoSimpleSource,
                                 public LogosDeliveryDemoInterface,
@@ -37,9 +38,11 @@ signals:
 private:
     void wireEvents();
     void bootstrapNode();
+    void refreshNodeInfo();
 
     LogosAPI* m_logosAPI = nullptr;
     LogosModules* m_logos = nullptr;
+    QTimer* m_pollTimer = nullptr;
 };
 
 #endif // LOGOS_DELIVERY_DEMO_PLUGIN_H
