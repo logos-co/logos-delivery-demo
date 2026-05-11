@@ -185,13 +185,13 @@ Item {
                         font.pixelSize: Theme.typography.secondaryText
                         color: Theme.palette.textSecondary
                     }
-                    LogosText {
+                    SelectableValue {
                         text: root.peerIdValue.length > 0
                               ? root.peerIdValue
                               : "(not available yet)"
-                        font.pixelSize: Theme.typography.primaryText
                         font.family: "monospace"
-                        elide: Text.ElideMiddle
+                        wrapMode: TextEdit.NoWrap
+                        clip: true
                         Layout.fillWidth: true
                     }
                     InfoChip {
@@ -530,12 +530,13 @@ Item {
                     color: Theme.palette.textSecondary
                 }
                 Item { Layout.fillWidth: true }
-                LogosText {
+                SelectableValue {
                     text: evt && evt.ts ? evt.ts : ""
                     visible: text.length > 0
                     font.family: "monospace"
                     font.pixelSize: Theme.typography.secondaryText
                     color: Theme.palette.textSecondary
+                    wrapMode: TextEdit.NoWrap
                 }
             }
 
@@ -568,14 +569,31 @@ Item {
             Layout.preferredWidth: 72
             Layout.alignment: multiline ? Qt.AlignTop : Qt.AlignVCenter
         }
-        LogosText {
+        SelectableValue {
             text: value
-            font.pixelSize: Theme.typography.primaryText
             font.family: mono ? "monospace" : Theme.typography.publicSans
             color: isError ? Theme.palette.error : Theme.palette.text
-            wrapMode: multiline ? Text.WrapAnywhere : Text.NoWrap
-            elide: multiline ? Text.ElideNone : Text.ElideMiddle
+            wrapMode: multiline ? TextEdit.WrapAnywhere : TextEdit.NoWrap
             Layout.fillWidth: true
         }
+    }
+
+    // Read-only TextEdit styled like LogosText, with mouse/keyboard selection
+    // so developers can copy hashes, topics, peer IDs, etc. straight out of
+    // the event log.
+    component SelectableValue: TextEdit {
+        readOnly: true
+        selectByMouse: true
+        selectByKeyboard: true
+        persistentSelection: true
+        textFormat: TextEdit.PlainText
+        font.family: Theme.typography.publicSans
+        font.pixelSize: Theme.typography.primaryText
+        color: Theme.palette.text
+        selectionColor: Theme.palette.primary
+        selectedTextColor: Theme.palette.background
+        // QtQuick.Controls cursor flash blends into a dark theme — turn it off
+        // since the field is read-only anyway.
+        cursorVisible: false
     }
 }
