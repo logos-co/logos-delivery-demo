@@ -1,0 +1,15 @@
+class LogosDeliveryDemo
+{
+    PROP(QString connectionStatus="initializing" READONLY)
+    PROP(bool nodeReady=false READONLY)
+    PROP(QString lastError="" READONLY)
+
+    SIGNAL(messageReceived(QString topic, QString payloadBase64, QString messageHash, QString timestamp))
+    SIGNAL(messageSentNotif(QString requestId, QString messageHash))
+    SIGNAL(messagePropagatedNotif(QString requestId, QString messageHash))
+    SIGNAL(messageErrorNotif(QString requestId, QString errorText))
+
+    SLOT(QString subscribe(QString topic))
+    SLOT(QString unsubscribe(QString topic))
+    SLOT(QString sendMessage(QString topic, QString text))
+}

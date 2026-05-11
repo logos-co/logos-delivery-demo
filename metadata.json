@@ -1,0 +1,22 @@
+{
+  "name": "logos_delivery_demo",
+  "version": "0.1.0",
+  "type": "ui_qml",
+  "category": "messaging",
+  "description": "Educational UI demo for logos-delivery-module: subscribe to content topics, send and receive messages, see which delivery_module API calls back each interaction.",
+  "main": "logos_delivery_demo_plugin",
+  "view": "qml/Main.qml",
+  "icon": null,
+  "dependencies": ["delivery_module"],
+
+  "nix": {
+    "packages": { "build": [], "runtime": [] },
+    "external_libraries": [],
+    "cmake": {
+      "find_packages": [],
+      "extra_sources": [],
+      "extra_include_dirs": [],
+      "extra_link_libraries": []
+    }
+  }
+}
