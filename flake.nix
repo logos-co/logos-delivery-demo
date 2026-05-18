@@ -6,7 +6,7 @@
     delivery_module.url = "github:logos-co/logos-delivery-module/v0.1.1";
     # Logos.Theme / Logos.Controls for src/qml/Main.qml. Pinned here so the
     # version is controlled per-module via this repo's flake.lock.
-    logos-design-system.url = "github:logos-co/logos-design-system";
+    logos-design-system.url = "github:logos-co/logos-design-system?rev=6176f0d7a5dfeb64a7f0f98e7ca2bf71a4804772";
   };
 
   outputs = inputs@{ logos-module-builder, logos-design-system, ... }:
