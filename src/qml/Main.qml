@@ -19,6 +19,7 @@ Item {
     readonly property string peerIdValue:   backend ? backend.peerId          : ""
     readonly property int    peerCountValue: backend ? backend.peerCount      : 0
     readonly property string lastErrorValue: backend ? backend.lastError      : ""
+    readonly property string deliveryVersionValue: backend ? backend.deliveryVersion : ""
 
     Connections {
         target: backend
@@ -155,6 +156,23 @@ Item {
                         text: "Logos Delivery demo"
                         font.pixelSize: Theme.typography.panelTitleText
                         font.weight: Theme.typography.weightBold
+                    }
+
+                    SelectableValue {
+                        text: "logos-delivery " + root.deliveryVersionValue
+                        visible: root.deliveryVersionValue.length > 0
+                        font.family: "monospace"
+                        font.pixelSize: Theme.typography.secondaryText
+                        color: Theme.palette.textSecondary
+                        wrapMode: TextEdit.NoWrap
+                    }
+                    InfoChip {
+                        visible: root.deliveryVersionValue.length > 0
+                        tip: "<b>logos-delivery version</b> — the version string of the "
+                           + "<code>liblogosdelivery</code> library backing the module.<br><br>"
+                           + "Read once after the node starts via "
+                           + "<code>delivery_module.getNodeInfo(\"Version\")</code> "
+                           + "(the same call the module's own <code>version()</code> wraps)."
                     }
 
                     Item { Layout.fillWidth: true }

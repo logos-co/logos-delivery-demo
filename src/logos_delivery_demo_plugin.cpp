@@ -107,6 +107,15 @@ void LogosDeliveryDemoPlugin::bootstrapNode()
 
     setNodeReady(true);
 
+    // logos-delivery (liblogosdelivery) version. Exposed as the "Version"
+    // getNodeInfo attribute — the same call delivery_module's own version()
+    // wraps. It's fixed for the life of the node, so fetch it once here
+    // rather than in the 3s poll below.
+    LogosResult version = m_logos->delivery_module.getNodeInfo(QStringLiteral("Version"));
+    if (version.success) {
+        setDeliveryVersion(version.getString());
+    }
+
     // Poll node info (peer id, peer count) every 3s — the module only exposes
     // them via getNodeInfo, so we surface them to QML as auto-synced PROPs.
     m_pollTimer = new QTimer(this);
