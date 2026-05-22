@@ -8,10 +8,10 @@ class LogosDeliveryDemo
     PROP(int portsShift=0 READONLY)
     PROP(QString deliveryVersion="" READONLY)
 
-    SIGNAL(messageReceived(QString topic, QString payload, QString messageHash, QString timestamp))
-    SIGNAL(messageSentNotif(QString requestId, QString messageHash, QString timestamp))
-    SIGNAL(messagePropagatedNotif(QString requestId, QString messageHash, QString timestamp))
-    SIGNAL(messageErrorNotif(QString requestId, QString messageHash, QString errorText, QString timestamp))
+    SIGNAL(messageReceived(QString topic, QString payload, QString messageHash, qint64 timestamp))
+    SIGNAL(messageSentNotif(QString requestId, QString messageHash, qint64 timestamp))
+    SIGNAL(messagePropagatedNotif(QString requestId, QString messageHash, qint64 timestamp))
+    SIGNAL(messageErrorNotif(QString requestId, QString messageHash, QString errorText, qint64 timestamp))
 
     SLOT(QString subscribe(QString topic))
     SLOT(QString unsubscribe(QString topic))

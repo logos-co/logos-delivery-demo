@@ -29,7 +29,15 @@ void LogosDeliveryDemoPlugin::initLogos(LogosAPI* api)
     setBackend(this);
 
     wireEvents();
-    bootstrapNode();
+
+    // Defer the node bootstrap to the next event-loop turn. The ui-host runs
+    // initLogos() on its main thread and only prints its READY marker to the
+    // host *after* this returns; createNode()/start() are synchronous and
+    // network-bound (several seconds), so running them inline would delay READY
+    // past the host's readiness timeout and the module would be reported as
+    // "Failed to load UI plugin". A queued singleShot fires once the ui-host
+    // has signalled READY and entered its event loop.
+    QTimer::singleShot(0, this, [this]() { bootstrapNode(); });
 }
 
 void LogosDeliveryDemoPlugin::wireEvents()
@@ -46,31 +54,31 @@ void LogosDeliveryDemoPlugin::wireEvents()
         // layer is byte-agnostic — this demo just treats payloads as UTF-8 text.
         const QByteArray decoded = QByteArray::fromBase64(data.at(2).toString().toUtf8());
 
-        // data[3] arrives as nanoseconds since epoch on messageReceived, while
-        // every other event emits a local ISO-8601 string in the same slot.
-        // Passing it through verbatim so the inconsistency is visible to
-        // anyone reading the demo. Tracked at
-        // https://github.com/logos-co/logos-delivery-module/issues/26
+        // data[3] is the timestamp as a qint64 unix timestamp (nanoseconds since
+        // epoch). Since logos-delivery-module #29 every event reports its
+        // timestamp this way (messageReceived carries the received message's own
+        // timestamp; the others carry a local wall-clock time), so the slot is a
+        // qint64 across all events now.
         emit messageReceived(
             data.at(1).toString(),                 // contentTopic
             QString::fromUtf8(decoded),            // payload (utf-8 decoded)
             data.at(0).toString(),                 // messageHash
-            data.at(3).toString());                // timestamp (raw — see #26)
+            data.at(3).toLongLong());              // timestamp (qint64, ns since epoch)
     });
 
     m_logos->delivery_module.on("messageSent", [this](const QVariantList& data) {
         if (data.size() < 3) return;
-        emit messageSentNotif(data.at(0).toString(), data.at(1).toString(), data.at(2).toString());
+        emit messageSentNotif(data.at(0).toString(), data.at(1).toString(), data.at(2).toLongLong());
     });
 
     m_logos->delivery_module.on("messagePropagated", [this](const QVariantList& data) {
         if (data.size() < 3) return;
-        emit messagePropagatedNotif(data.at(0).toString(), data.at(1).toString(), data.at(2).toString());
+        emit messagePropagatedNotif(data.at(0).toString(), data.at(1).toString(), data.at(2).toLongLong());
     });
 
     m_logos->delivery_module.on("messageError", [this](const QVariantList& data) {
         if (data.size() < 4) return;
-        emit messageErrorNotif(data.at(0).toString(), data.at(1).toString(), data.at(2).toString(), data.at(3).toString());
+        emit messageErrorNotif(data.at(0).toString(), data.at(1).toString(), data.at(2).toString(), data.at(3).toLongLong());
     });
 }
 
