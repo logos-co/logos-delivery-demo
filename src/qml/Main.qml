@@ -10,6 +10,12 @@ Item {
 
     readonly property var backend: logos.module("logos_delivery_demo")
 
+    // Monospace family for code-like values (peer ids, hashes, topics,
+    // payloads, request ids, timestamps, method signatures). The design system
+    // ships no mono token, so centralise the generic family here — Qt maps
+    // "monospace" to the platform's fixed-pitch font.
+    readonly property string monoFont: "monospace"
+
     // Single global event log. Each entry is an observed event:
     //   { eventName, direction, topic, payload, hash, requestId, errorText, ts }
     property var events: []
@@ -184,7 +190,7 @@ Item {
                     SelectableValue {
                         text: "logos-delivery " + root.deliveryVersionValue
                         visible: root.deliveryVersionValue.length > 0
-                        font.family: "monospace"
+                        font.family: root.monoFont
                         font.pixelSize: Theme.typography.secondaryText
                         color: Theme.palette.textSecondary
                         wrapMode: TextEdit.NoWrap
@@ -240,7 +246,7 @@ Item {
                         text: root.peerIdValue.length > 0
                               ? root.peerIdValue
                               : "(not available yet)"
-                        font.family: "monospace"
+                        font.family: root.monoFont
                         wrapMode: TextEdit.NoWrap
                         clip: true
                         Layout.fillWidth: true
@@ -482,14 +488,14 @@ Item {
 
             LogosText {
                 text: mc.methodName
-                font.family: "monospace"
+                font.family: root.monoFont
                 font.pixelSize: Theme.typography.primaryText
                 font.weight: Theme.typography.weightBold
                 color: Theme.palette.primary
             }
             LogosText {
                 text: "("
-                font.family: "monospace"
+                font.family: root.monoFont
                 font.pixelSize: Theme.typography.primaryText
                 color: Theme.palette.textSecondary
             }
@@ -506,7 +512,7 @@ Item {
             LogosText {
                 visible: mc.hasArg2
                 text: ","
-                font.family: "monospace"
+                font.family: root.monoFont
                 font.pixelSize: Theme.typography.primaryText
                 color: Theme.palette.textSecondary
             }
@@ -524,7 +530,7 @@ Item {
             }
             LogosText {
                 text: ")"
-                font.family: "monospace"
+                font.family: root.monoFont
                 font.pixelSize: Theme.typography.primaryText
                 color: Theme.palette.textSecondary
             }
@@ -570,14 +576,14 @@ Item {
 
             LogosText {
                 text: "createNode"
-                font.family: "monospace"
+                font.family: root.monoFont
                 font.pixelSize: Theme.typography.primaryText
                 font.weight: Theme.typography.weightBold
                 color: Theme.palette.primary
             }
             LogosText {
                 text: "("
-                font.family: "monospace"
+                font.family: root.monoFont
                 font.pixelSize: Theme.typography.primaryText
                 color: Theme.palette.textSecondary
             }
@@ -592,7 +598,7 @@ Item {
             }
             LogosText {
                 text: ","
-                font.family: "monospace"
+                font.family: root.monoFont
                 font.pixelSize: Theme.typography.primaryText
                 color: Theme.palette.textSecondary
             }
@@ -606,7 +612,7 @@ Item {
             }
             LogosText {
                 text: ")"
-                font.family: "monospace"
+                font.family: root.monoFont
                 font.pixelSize: Theme.typography.primaryText
                 color: Theme.palette.textSecondary
             }
@@ -687,14 +693,14 @@ Item {
                 SelectableValue {
                     text: evt && evt.ts ? root.formatTs(evt.ts) : ""
                     visible: text.length > 0
-                    font.family: "monospace"
+                    font.family: root.monoFont
                     font.pixelSize: Theme.typography.secondaryText
                     color: Theme.palette.textSecondary
                     wrapMode: TextEdit.NoWrap
                 }
             }
 
-            FieldRow { name: "topic";     value: evt ? evt.topic     || "" : "" }
+            FieldRow { name: "topic";     value: evt ? evt.topic     || "" : ""; mono: true }
             FieldRow { name: "payload (hex)"; value: evt ? evt.payload || "" : ""; mono: true; multiline: true }
             FieldRow { name: "hash";      value: evt ? evt.hash      || "" : ""; mono: true }
             FieldRow { name: "requestId"; value: evt ? evt.requestId || "" : ""; mono: true }
@@ -725,7 +731,7 @@ Item {
         }
         SelectableValue {
             text: value
-            font.family: mono ? "monospace" : Theme.typography.publicSans
+            font.family: mono ? root.monoFont : Theme.typography.publicSans
             color: isError ? Theme.palette.error : Theme.palette.text
             wrapMode: multiline ? TextEdit.WrapAnywhere : TextEdit.NoWrap
             Layout.fillWidth: true
