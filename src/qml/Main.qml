@@ -72,6 +72,15 @@ Item {
         Qt.callLater(eventView.positionViewAtEnd)
     }
 
+    // Event timestamps arrive as a qint64 of nanoseconds since the Unix epoch.
+    // Convert to milliseconds for a JS Date and render as readable local time.
+    // (ns exceeds JS's safe-integer range, but ms is comfortably within it and
+    //  the lost sub-millisecond precision doesn't matter for display.)
+    function formatTs(ts) {
+        if (!ts) return ""
+        return Qt.formatDateTime(new Date(Math.floor(ts / 1000000)), "yyyy-MM-dd hh:mm:ss.zzz")
+    }
+
     // ── Method-call invocations (logged as local events) ──────────────────────
 
     function callCreateNode(preset, mode) {
@@ -669,7 +678,7 @@ Item {
                 }
                 Item { Layout.fillWidth: true }
                 SelectableValue {
-                    text: evt && evt.ts ? evt.ts : ""
+                    text: evt && evt.ts ? root.formatTs(evt.ts) : ""
                     visible: text.length > 0
                     font.family: "monospace"
                     font.pixelSize: Theme.typography.secondaryText
