@@ -4,7 +4,6 @@ class LogosDeliveryDemo
     PROP(bool nodeReady=false READONLY)
     PROP(QString lastError="" READONLY)
     PROP(QString peerId="" READONLY)
-    PROP(int peerCount=0 READONLY)
     PROP(QString deliveryVersion="" READONLY)
 
     SIGNAL(messageReceived(QString topic, QString payload, QString messageHash, qint64 timestamp))

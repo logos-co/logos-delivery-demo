@@ -13,7 +13,7 @@ Pinned to `logos-delivery-module` [**`v0.1.1`**](https://github.com/logos-co/log
 - Declaring `delivery_module` as a Logos module dependency (in `metadata.json` and `flake.nix`)
 - Constructing the typed `LogosModules` wrapper from `LogosAPI*` in `initLogos`
 - Bootstrapping the node from the UI with `createNode(...)` and `start()`, with `LogosResult` checks — the fleet (`logos.test` / `logos.dev`, defaulting to `logos.test`) and node mode (`Core` / `Edge`) are picked from dropdowns
-- Polling `delivery_module.getNodeInfo(...)` for my peer ID (`MyPeerId`) and peer count (parsed from the `Metrics` Prometheus text, `libp2p_peers` gauge) every 3s, and reading the `logos-delivery` library version once at startup (`getNodeInfo("Version")`)
+- Polling `delivery_module.getNodeInfo("MyPeerId")` for my peer ID every 3s, and reading the `logos-delivery` library version once at startup (`getNodeInfo("Version")`)
 - Surfacing `connectionStateChanged` as a live status badge
 - A **global event log** that renders every observed event verbatim — `messageReceived`, `messageSent`, `messagePropagated`, `messageError`, plus the local return values of `createNode()` / `subscribe()` / `unsubscribe()` / `send()` — colour-coded by event kind, with every field selectable so you can copy hashes, topics, payloads, request ids
 - A **method-call playground** at the bottom: one row per public `delivery_module` API call (`createNode`, `subscribe`, `unsubscribe`, `send`), rendered as `methodName(arg…)` with a `Call` button — every interaction is reflected as a row in the event log above. `createNode`'s two arguments are fixed-choice enums picked from dropdowns; message payloads are raw **bytes**: enter them as hex when sending, and received payloads are shown as hex

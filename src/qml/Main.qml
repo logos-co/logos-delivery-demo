@@ -17,7 +17,6 @@ Item {
     readonly property string nodeStatus:    backend ? backend.connectionStatus : "no backend"
     readonly property bool   nodeReady:     backend ? backend.nodeReady       : false
     readonly property string peerIdValue:   backend ? backend.peerId          : ""
-    readonly property int    peerCountValue: backend ? backend.peerCount      : 0
     readonly property string lastErrorValue: backend ? backend.lastError      : ""
     readonly property string deliveryVersionValue: backend ? backend.deliveryVersion : ""
 
@@ -196,17 +195,6 @@ Item {
                         text: root.nodeReady ? root.nodeStatus : "no node — call createNode"
                         color: root.nodeReady ? Theme.palette.success : Theme.palette.textSecondary
                     }
-
-                    LogosBadge {
-                        text: "peers: " + root.peerCountValue
-                        color: root.peerCountValue > 0 ? Theme.palette.success : Theme.palette.textSecondary
-                    }
-                    InfoChip {
-                        tip: "<b>peers</b> — number of currently-connected libp2p peers.<br><br>"
-                           + "Polled every 3 seconds from "
-                           + "<code>delivery_module.getNodeInfo(\"Metrics\")</code> "
-                           + "and parsed out of the <code>libp2p_peers</code> Prometheus gauge."
-                    }
                 }
 
                 RowLayout {
@@ -230,7 +218,7 @@ Item {
                     InfoChip {
                         tip: "<b>Peer ID</b> — this node's local libp2p peer identifier.<br><br>"
                            + "Returned by <code>delivery_module.getNodeInfo(\"MyPeerId\")</code>, "
-                           + "polled every 3 seconds together with the peer count."
+                           + "polled every 3 seconds."
                     }
                 }
 
