@@ -300,6 +300,13 @@ Item {
                         font.pixelSize: Theme.typography.secondaryText
                         color: Theme.palette.textSecondary
                     }
+                    LogosButton {
+                        text: "Clear"
+                        enabled: root.events.length > 0
+                        Layout.preferredHeight: 28
+                        implicitHeight: 28
+                        onClicked: root.events = []
+                    }
                     InfoChip {
                         tip: "<b>Event log</b> — every observed event in order, across all topics.<br><br>"
                            + "<code>messageReceived</code> — a peer sent us a message.<br>"
