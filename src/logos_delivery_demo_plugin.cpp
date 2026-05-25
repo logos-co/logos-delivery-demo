@@ -107,11 +107,15 @@ void LogosDeliveryDemoPlugin::bootstrapNode()
         return;
     }
 
+    qInfo() << "logos_delivery_demo: createNode succeeded, starting node...";
+
     LogosResult started = m_logos->delivery_module.start();
     if (!started.success) {
         setLastError(QStringLiteral("start failed: %1").arg(started.getError()));
         return;
     }
+
+    qInfo() << "logos_delivery_demo: Node started successfully";
 
     setNodeReady(true);
 
