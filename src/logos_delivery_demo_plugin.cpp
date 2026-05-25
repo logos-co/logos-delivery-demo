@@ -6,7 +6,6 @@
 #include <QDebug>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QRandomGenerator>
 #include <QRegularExpression>
 #include <QTimer>
 
@@ -84,22 +83,16 @@ void LogosDeliveryDemoPlugin::wireEvents()
 
 void LogosDeliveryDemoPlugin::bootstrapNode()
 {
-    // Pick a random port shift so two demo instances on one machine don't
-    // collide on tcp/rest/metrics/discv5/websocket ports. Temporary — once
-    // https://github.com/logos-co/logos-delivery-module/issues/18 lands,
-    // the host will supply per-instance ports via env vars and the demo
-    // won't need to set portsShift at all.
-    const int portsShift = 100 + static_cast<int>(QRandomGenerator::global()->bounded(4500));
-
+    // No port config: logos-delivery-module defaults unspecified ports to 0, so
+    // the OS assigns free ports and two demo instances on one machine don't
+    // collide — no port-shift workaround needed.
     QJsonObject cfg{
         {"logLevel", "INFO"},
         {"mode", "Core"},
-        {"preset", "logos.dev"},
-        {"portsShift", portsShift}
+        {"preset", "logos.dev"}
     };
     const QString cfgJson = QString::fromUtf8(QJsonDocument(cfg).toJson(QJsonDocument::Compact));
-    qInfo() << "logos_delivery_demo: createNode portsShift=" << portsShift;
-    setPortsShift(portsShift);
+    qInfo() << "logos_delivery_demo: createNode" << cfgJson;
 
     LogosResult create = m_logos->delivery_module.createNode(cfgJson);
     if (!create.success) {

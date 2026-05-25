@@ -66,9 +66,7 @@ The demo hardcodes the **`logos.dev`** preset for the underlying `createNode` ca
 
 ### Running multiple instances on one machine
 
-Run `nix run` twice in separate terminals — subscribe both to the same content topic, send from one, and the other will fire `messageReceived`. Each instance picks a random `portsShift` value and passes it to `createNode`, so the underlying waku listeners (TCP, discv5, …) don't collide.
-
-> **Note.** Generating a random `portsShift` in the demo is a temporary workaround. It will go away once [`logos-delivery-module#18`](https://github.com/logos-co/logos-delivery-module/issues/18) lands — the module will then expose env-var overrides for each listening port and the host (e.g. basecamp profiles) will assign unique ports per instance without the consumer caring.
+Run `nix run` twice in separate terminals — subscribe both to the same content topic, send from one, and the other will fire `messageReceived`. The demo specifies no ports, so `logos-delivery-module` defaults them to `0` and the OS assigns free ports per instance — the underlying waku listeners (TCP, discv5, …) don't collide.
 
 ## References
 
