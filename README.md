@@ -12,11 +12,11 @@ Pinned to `logos-delivery-module` [**`v0.1.1`**](https://github.com/logos-co/log
 
 - Declaring `delivery_module` as a Logos module dependency (in `metadata.json` and `flake.nix`)
 - Constructing the typed `LogosModules` wrapper from `LogosAPI*` in `initLogos`
-- Bootstrapping the node with `createNode(...)` and `start()`, with `LogosResult` checks
+- Bootstrapping the node from the UI with `createNode(...)` and `start()`, with `LogosResult` checks — the fleet (`logos.test` / `logos.dev`, defaulting to `logos.test`) and node mode (`Core` / `Edge`) are picked from dropdowns
 - Polling `delivery_module.getNodeInfo(...)` for my peer ID (`MyPeerId`) and peer count (parsed from the `Metrics` Prometheus text, `libp2p_peers` gauge) every 3s, and reading the `logos-delivery` library version once at startup (`getNodeInfo("Version")`)
 - Surfacing `connectionStateChanged` as a live status badge
-- A **global event log** that renders every observed event verbatim — `messageReceived`, `messageSent`, `messagePropagated`, `messageError`, plus the local return values of `subscribe()` / `unsubscribe()` / `send()` — colour-coded by event kind, with every field selectable so you can copy hashes, topics, payloads, request ids
-- A **method-call playground** at the bottom: one row per public `delivery_module` API call (`subscribe`, `unsubscribe`, `send`), rendered as `methodName(arg…)` with a `Call` button — every interaction is reflected as a row in the event log above. Message payloads are raw **bytes**: enter them as hex when sending, and received payloads are shown as hex
+- A **global event log** that renders every observed event verbatim — `messageReceived`, `messageSent`, `messagePropagated`, `messageError`, plus the local return values of `createNode()` / `subscribe()` / `unsubscribe()` / `send()` — colour-coded by event kind, with every field selectable so you can copy hashes, topics, payloads, request ids
+- A **method-call playground** at the bottom: one row per public `delivery_module` API call (`createNode`, `subscribe`, `unsubscribe`, `send`), rendered as `methodName(arg…)` with a `Call` button — every interaction is reflected as a row in the event log above. `createNode`'s two arguments are fixed-choice enums picked from dropdowns; message payloads are raw **bytes**: enter them as hex when sending, and received payloads are shown as hex
 - An info `?` chip next to every interactive element with a tooltip spelling out the exact `delivery_module` call behind it — the demo doubles as live API documentation
 - Using **[`Logos.Theme`](https://github.com/logos-co/logos-design-system) and `Logos.Controls`** for tokens, colors, and themed components — no hard-coded styling in the demo
 
@@ -62,7 +62,7 @@ The C++ backend lives in the `ui-host` process; the QML view runs in the host ap
 
 ## Network
 
-The demo hardcodes the **`logos.dev`** preset for the underlying `createNode` call. Configuration is intentionally not exposed in the UI — the goal is to show the `delivery_module` API surface, not act as a general-purpose chat client.
+The node is **not** started automatically. Use the `createNode` row in the method-call playground to create and start it against a chosen network: pick the preset — **`logos.test`** (Logos Test Network, the default) or **`logos.dev`** (Logos Dev Network) — and the node **mode** — `Core` (full relay node) or `Edge` (light node). `createNode` can be called once per session; the other API calls stay disabled until the node is ready. To switch fleet/mode, restart the app.
 
 ### Running multiple instances on one machine
 

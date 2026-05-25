@@ -29,14 +29,9 @@ void LogosDeliveryDemoPlugin::initLogos(LogosAPI* api)
 
     wireEvents();
 
-    // Defer the node bootstrap to the next event-loop turn. The ui-host runs
-    // initLogos() on its main thread and only prints its READY marker to the
-    // host *after* this returns; createNode()/start() are synchronous and
-    // network-bound (several seconds), so running them inline would delay READY
-    // past the host's readiness timeout and the module would be reported as
-    // "Failed to load UI plugin". A queued singleShot fires once the ui-host
-    // has signalled READY and entered its event loop.
-    QTimer::singleShot(0, this, [this]() { bootstrapNode(); });
+    // The node is no longer bootstrapped automatically — the UI drives it by
+    // calling createNode(preset, mode), so the demo can be exercised against
+    // different fleets (logos.dev / logos.test) and node modes (Core / Edge).
 }
 
 void LogosDeliveryDemoPlugin::wireEvents()
@@ -80,15 +75,19 @@ void LogosDeliveryDemoPlugin::wireEvents()
     });
 }
 
-void LogosDeliveryDemoPlugin::bootstrapNode()
+QString LogosDeliveryDemoPlugin::createNode(QString preset, QString mode)
 {
+    if (!m_logos) return QStringLiteral("Backend not initialised");
+    if (nodeReady()) return QStringLiteral("Node already created");
+
     // No port config: logos-delivery-module defaults unspecified ports to 0, so
     // the OS assigns free ports and two demo instances on one machine don't
-    // collide — no port-shift workaround needed.
+    // collide — no port-shift workaround needed. Preset (logos.dev / logos.test)
+    // and mode (Core / Edge) come from the UI.
     QJsonObject cfg{
         {"logLevel", "INFO"},
-        {"mode", "Core"},
-        {"preset", "logos.dev"}
+        {"mode", mode},
+        {"preset", preset}
     };
     const QString cfgJson = QString::fromUtf8(QJsonDocument(cfg).toJson(QJsonDocument::Compact));
     qInfo() << "logos_delivery_demo: createNode" << cfgJson;
@@ -96,7 +95,7 @@ void LogosDeliveryDemoPlugin::bootstrapNode()
     LogosResult create = m_logos->delivery_module.createNode(cfgJson);
     if (!create.success) {
         setLastError(QStringLiteral("createNode failed: %1").arg(create.getError()));
-        return;
+        return create.getError();
     }
 
     qInfo() << "logos_delivery_demo: createNode succeeded, starting node...";
@@ -104,7 +103,7 @@ void LogosDeliveryDemoPlugin::bootstrapNode()
     LogosResult started = m_logos->delivery_module.start();
     if (!started.success) {
         setLastError(QStringLiteral("start failed: %1").arg(started.getError()));
-        return;
+        return started.getError();
     }
 
     qInfo() << "logos_delivery_demo: Node started successfully";
@@ -127,6 +126,8 @@ void LogosDeliveryDemoPlugin::bootstrapNode()
     QObject::connect(m_pollTimer, &QTimer::timeout, this, &LogosDeliveryDemoPlugin::refreshNodeInfo);
     refreshNodeInfo();
     m_pollTimer->start();
+
+    return QString();
 }
 
 void LogosDeliveryDemoPlugin::refreshNodeInfo()

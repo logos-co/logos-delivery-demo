@@ -75,6 +75,21 @@ Item {
 
     // ── Method-call invocations (logged as local events) ──────────────────────
 
+    function callCreateNode(preset, mode) {
+        if (!preset || !mode) return
+        logos.watch(backend.createNode(preset, mode),
+            function(errStr) {
+                root.logEvent({
+                    eventName: "createNode() returned",
+                    direction: "local",
+                    topic: preset + " / " + mode,
+                    errorText: errStr || ""
+                })
+            },
+            function(_e) {}
+        )
+    }
+
     function callSubscribe(topic) {
         if (!topic) return
         logos.watch(backend.subscribe(topic),
@@ -178,8 +193,8 @@ Item {
                     Item { Layout.fillWidth: true }
 
                     LogosBadge {
-                        text: root.nodeReady ? root.nodeStatus : "starting…"
-                        color: root.nodeReady ? Theme.palette.success : Theme.palette.warning
+                        text: root.nodeReady ? root.nodeStatus : "no node — call createNode"
+                        color: root.nodeReady ? Theme.palette.success : Theme.palette.textSecondary
                     }
 
                     LogosBadge {
@@ -273,7 +288,7 @@ Item {
                            + "<code>messageSent</code> — our outgoing message was accepted by the local node.<br>"
                            + "<code>messagePropagated</code> — the message was relayed to the network.<br>"
                            + "<code>messageError</code> — the outgoing message failed.<br>"
-                           + "<code>subscribe()</code> / <code>unsubscribe()</code> / <code>send() returned</code> — "
+                           + "<code>createNode()</code> / <code>subscribe()</code> / <code>unsubscribe()</code> / <code>send() returned</code> — "
                            + "the immediate return value of the local API call (logged here so the demo is a faithful trace)."
                     }
                 }
@@ -294,6 +309,21 @@ Item {
         ColumnLayout {
             Layout.fillWidth: true
             spacing: Theme.spacing.small
+
+            CreateNodeCall {
+                callEnabled: root.backend && !root.nodeReady
+                infoTip: "<b>delivery_module.createNode(config)</b> + <b>start()</b><br><br>"
+                       + "Create and start the node against a chosen network.<br>"
+                       + "<b>preset</b> — <code>logos.dev</code> (Logos Dev Network) or "
+                       + "<code>logos.test</code> (Logos Test Network); both auto-configure "
+                       + "cluster id, entry nodes, sharding and RLN.<br>"
+                       + "<b>mode</b> — <code>Core</code> (full relay node) or "
+                       + "<code>Edge</code> (light/edge node).<br><br>"
+                       + "The node is no longer started automatically, so you can exercise "
+                       + "the module against different fleets and modes. Can be called once "
+                       + "per session."
+                onCall: function(preset, mode) { root.callCreateNode(preset, mode) }
+            }
 
             MethodCall {
                 methodName: "subscribe"
@@ -488,6 +518,86 @@ Item {
         }
     }
 
+    // ── createNode playground row ─────────────────────────────────────────────
+    // Like MethodCall, but the two arguments are fixed-choice enums, so they are
+    // picked from dropdowns rather than typed:
+    //   createNode ( [logos.dev ▾], [Core ▾] ) [Call] [?]
+    component CreateNodeCall: Rectangle {
+        id: cn
+
+        property string infoTip: ""
+        property bool   callEnabled: true
+
+        signal call(string preset, string mode)
+
+        Layout.fillWidth: true
+        Layout.preferredHeight: cnRow.implicitHeight + Theme.spacing.medium * 2
+        color: Theme.palette.backgroundSecondary
+        radius: Theme.spacing.radiusMedium
+        border.width: 1
+        border.color: Theme.palette.borderHairline
+
+        RowLayout {
+            id: cnRow
+            anchors.fill: parent
+            anchors.margins: Theme.spacing.medium
+            spacing: Theme.spacing.tiny
+
+            LogosText {
+                text: "createNode"
+                font.family: "monospace"
+                font.pixelSize: Theme.typography.primaryText
+                font.weight: Theme.typography.weightBold
+                color: Theme.palette.primary
+            }
+            LogosText {
+                text: "("
+                font.family: "monospace"
+                font.pixelSize: Theme.typography.primaryText
+                color: Theme.palette.textSecondary
+            }
+            LogosComboBox {
+                id: presetBox
+                // logos.test is the default fleet.
+                model: ["logos.test", "logos.dev"]
+                currentIndex: 0
+                enabled: cn.callEnabled
+                Layout.fillWidth: true
+                Layout.minimumWidth: 120
+            }
+            LogosText {
+                text: ","
+                font.family: "monospace"
+                font.pixelSize: Theme.typography.primaryText
+                color: Theme.palette.textSecondary
+            }
+            LogosComboBox {
+                id: modeBox
+                model: ["Core", "Edge"]
+                currentIndex: 0
+                enabled: cn.callEnabled
+                Layout.fillWidth: true
+                Layout.minimumWidth: 120
+            }
+            LogosText {
+                text: ")"
+                font.family: "monospace"
+                font.pixelSize: Theme.typography.primaryText
+                color: Theme.palette.textSecondary
+            }
+            LogosButton {
+                text: "Call"
+                Layout.preferredWidth: 72
+                Layout.preferredHeight: 40
+                implicitWidth: 72
+                implicitHeight: 40
+                enabled: cn.callEnabled
+                onClicked: cn.call(presetBox.currentText, modeBox.currentText)
+            }
+            InfoChip { tip: cn.infoTip }
+        }
+    }
+
     // Developer-facing event row. Renders every field of the event verbatim.
     component MessageItem: Rectangle {
         property var evt
@@ -498,6 +608,7 @@ Item {
                 case "messageSent":        return Theme.palette.textSecondary
                 case "messagePropagated":  return Theme.palette.success
                 case "messageError":       return Theme.palette.error
+                case "createNode() returned":
                 case "subscribe() returned":
                 case "unsubscribe() returned":
                 case "send() returned":    return Theme.palette.primary
