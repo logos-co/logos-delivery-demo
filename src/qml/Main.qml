@@ -299,19 +299,6 @@ Item {
                         text: "Event log"
                         font.pixelSize: Theme.typography.subtitleText
                         font.weight: Theme.typography.weightBold
-                        Layout.fillWidth: true
-                    }
-                    LogosText {
-                        text: root.events.length + " event" + (root.events.length === 1 ? "" : "s")
-                        font.pixelSize: Theme.typography.secondaryText
-                        color: Theme.palette.textSecondary
-                    }
-                    LogosButton {
-                        text: "Clear"
-                        enabled: root.events.length > 0
-                        Layout.preferredHeight: 28
-                        implicitHeight: 28
-                        onClicked: root.events = []
                     }
                     InfoChip {
                         tip: "<b>Event log</b> — every observed event in order, across all topics.<br><br>"
@@ -321,6 +308,23 @@ Item {
                            + "<code>messageError</code> — the outgoing message failed.<br>"
                            + "<code>createNode()</code> / <code>subscribe()</code> / <code>unsubscribe()</code> / <code>send() returned</code> — "
                            + "the immediate return value of the local API call (logged here so the demo is a faithful trace)."
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    LogosText {
+                        text: root.events.length + " event" + (root.events.length === 1 ? "" : "s")
+                        font.pixelSize: Theme.typography.secondaryText
+                        color: Theme.palette.textSecondary
+                    }
+                    LogosButton {
+                        text: "Clear"
+                        enabled: root.events.length > 0
+                        Layout.preferredWidth: 56
+                        Layout.preferredHeight: 28
+                        implicitWidth: 56
+                        implicitHeight: 28
+                        onClicked: root.events = []
                     }
                 }
 
