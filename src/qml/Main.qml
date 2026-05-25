@@ -318,11 +318,11 @@ Item {
             MethodCall {
                 methodName: "send"
                 arg1Name: "contentTopic"
-                arg2Name: "payload"
+                arg2Name: "payload (hex)"
                 callEnabled: root.nodeReady
                 infoTip: "<b>delivery_module.send(contentTopic, payload)</b><br><br>"
-                       + "Publish a message. The module base64-encodes the payload internally — "
-                       + "pass raw UTF-8 text.<br><br>"
+                       + "Publish a message. The payload is raw <b>bytes</b>, not text — "
+                       + "enter it as hex, e.g. <code>48 65 6c 6c 6f</code> or <code>48656c6c6f</code>.<br><br>"
                        + "On success the <code>LogosResult.getString()</code> value is the <b>request id</b>; "
                        + "the <code>messageSent</code> and <code>messagePropagated</code> events arrive "
                        + "asynchronously and carry the same request id."
@@ -559,7 +559,7 @@ Item {
             }
 
             FieldRow { name: "topic";     value: evt ? evt.topic     || "" : "" }
-            FieldRow { name: "payload";   value: evt ? evt.payload   || "" : ""; multiline: true }
+            FieldRow { name: "payload (hex)"; value: evt ? evt.payload || "" : ""; mono: true; multiline: true }
             FieldRow { name: "hash";      value: evt ? evt.hash      || "" : ""; mono: true }
             FieldRow { name: "requestId"; value: evt ? evt.requestId || "" : ""; mono: true }
             FieldRow { name: "error";     value: evt ? evt.errorText || "" : ""; isError: true }

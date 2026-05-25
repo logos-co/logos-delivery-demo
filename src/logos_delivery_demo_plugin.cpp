@@ -48,10 +48,9 @@ void LogosDeliveryDemoPlugin::wireEvents()
 
     m_logos->delivery_module.on("messageReceived", [this](const QVariantList& data) {
         if (data.size() < 4) return;
-        // The module event contract declares data[2] as a base64-encoded payload
-        // (because the QString event channel is text). The underlying delivery
-        // layer is byte-agnostic — this demo just treats payloads as UTF-8 text.
-        const QByteArray decoded = QByteArray::fromBase64(data.at(2).toString().toUtf8());
+        // data[2] is the message payload — arbitrary bytes, not text. Surface it
+        // as a space-separated hex string so the UI shows it as bytes.
+        const QByteArray payload = data.at(2).toByteArray();
 
         // data[3] is the timestamp as a qint64 unix timestamp (nanoseconds since
         // epoch). Since logos-delivery-module #29 every event reports its
@@ -59,10 +58,10 @@ void LogosDeliveryDemoPlugin::wireEvents()
         // timestamp; the others carry a local wall-clock time), so the slot is a
         // qint64 across all events now.
         emit messageReceived(
-            data.at(1).toString(),                 // contentTopic
-            QString::fromUtf8(decoded),            // payload (utf-8 decoded)
-            data.at(0).toString(),                 // messageHash
-            data.at(3).toLongLong());              // timestamp (qint64, ns since epoch)
+            data.at(1).toString(),                       // contentTopic
+            QString::fromLatin1(payload.toHex(' ')),     // payload (hex bytes)
+            data.at(0).toString(),                       // messageHash
+            data.at(3).toLongLong());                    // timestamp (qint64, ns since epoch)
     });
 
     m_logos->delivery_module.on("messageSent", [this](const QVariantList& data) {
@@ -175,10 +174,14 @@ QString LogosDeliveryDemoPlugin::unsubscribe(QString topic)
     return QString();
 }
 
-QString LogosDeliveryDemoPlugin::sendMessage(QString topic, QString text)
+QString LogosDeliveryDemoPlugin::sendMessage(QString topic, QString payloadHex)
 {
     if (!m_logos) return QStringLiteral("Backend not initialised");
-    LogosResult r = m_logos->delivery_module.send(topic, text);
+    // The payload is arbitrary bytes; the UI provides them as a hex string.
+    // send()'s payload arg is a QVariant carrying a QByteArray — pass the raw
+    // bytes so they cross unchanged (a QString would be re-encoded as UTF-8).
+    const QByteArray payload = QByteArray::fromHex(payloadHex.toLatin1());
+    LogosResult r = m_logos->delivery_module.send(topic, payload);
     if (!r.success) {
         setLastError(QStringLiteral("send(%1) failed: %2").arg(topic, r.getError()));
         return QString();

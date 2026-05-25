@@ -14,5 +14,5 @@ class LogosDeliveryDemo
 
     SLOT(QString subscribe(QString topic))
     SLOT(QString unsubscribe(QString topic))
-    SLOT(QString sendMessage(QString topic, QString text))
+    SLOT(QString sendMessage(QString topic, QString payloadHex))
 }

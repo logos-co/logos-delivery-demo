@@ -30,7 +30,7 @@ public:
 
     QString subscribe(QString topic) override;
     QString unsubscribe(QString topic) override;
-    QString sendMessage(QString topic, QString text) override;
+    QString sendMessage(QString topic, QString payloadHex) override;
 
 signals:
     void eventResponse(const QString& eventName, const QVariantList& args);
