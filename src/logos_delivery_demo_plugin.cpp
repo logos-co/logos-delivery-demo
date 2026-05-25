@@ -6,7 +6,6 @@
 #include <QDebug>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QRandomGenerator>
 #include <QRegularExpression>
 #include <QTimer>
 
@@ -29,7 +28,15 @@ void LogosDeliveryDemoPlugin::initLogos(LogosAPI* api)
     setBackend(this);
 
     wireEvents();
-    bootstrapNode();
+
+    // Defer the node bootstrap to the next event-loop turn. The ui-host runs
+    // initLogos() on its main thread and only prints its READY marker to the
+    // host *after* this returns; createNode()/start() are synchronous and
+    // network-bound (several seconds), so running them inline would delay READY
+    // past the host's readiness timeout and the module would be reported as
+    // "Failed to load UI plugin". A queued singleShot fires once the ui-host
+    // has signalled READY and entered its event loop.
+    QTimer::singleShot(0, this, [this]() { bootstrapNode(); });
 }
 
 void LogosDeliveryDemoPlugin::wireEvents()
@@ -41,57 +48,50 @@ void LogosDeliveryDemoPlugin::wireEvents()
 
     m_logos->delivery_module.on("messageReceived", [this](const QVariantList& data) {
         if (data.size() < 4) return;
-        // The module event contract declares data[2] as a base64-encoded payload
-        // (because the QString event channel is text). The underlying delivery
-        // layer is byte-agnostic — this demo just treats payloads as UTF-8 text.
-        const QByteArray decoded = QByteArray::fromBase64(data.at(2).toString().toUtf8());
+        // data[2] is the message payload — arbitrary bytes, not text. Surface it
+        // as a space-separated hex string so the UI shows it as bytes.
+        const QByteArray payload = data.at(2).toByteArray();
 
-        // data[3] arrives as nanoseconds since epoch on messageReceived, while
-        // every other event emits a local ISO-8601 string in the same slot.
-        // Passing it through verbatim so the inconsistency is visible to
-        // anyone reading the demo. Tracked at
-        // https://github.com/logos-co/logos-delivery-module/issues/26
+        // data[3] is the timestamp as a qint64 unix timestamp (nanoseconds since
+        // epoch). Since logos-delivery-module #29 every event reports its
+        // timestamp this way (messageReceived carries the received message's own
+        // timestamp; the others carry a local wall-clock time), so the slot is a
+        // qint64 across all events now.
         emit messageReceived(
-            data.at(1).toString(),                 // contentTopic
-            QString::fromUtf8(decoded),            // payload (utf-8 decoded)
-            data.at(0).toString(),                 // messageHash
-            data.at(3).toString());                // timestamp (raw — see #26)
+            data.at(1).toString(),                       // contentTopic
+            QString::fromLatin1(payload.toHex(' ')),     // payload (hex bytes)
+            data.at(0).toString(),                       // messageHash
+            data.at(3).toLongLong());                    // timestamp (qint64, ns since epoch)
     });
 
     m_logos->delivery_module.on("messageSent", [this](const QVariantList& data) {
         if (data.size() < 3) return;
-        emit messageSentNotif(data.at(0).toString(), data.at(1).toString(), data.at(2).toString());
+        emit messageSentNotif(data.at(0).toString(), data.at(1).toString(), data.at(2).toLongLong());
     });
 
     m_logos->delivery_module.on("messagePropagated", [this](const QVariantList& data) {
         if (data.size() < 3) return;
-        emit messagePropagatedNotif(data.at(0).toString(), data.at(1).toString(), data.at(2).toString());
+        emit messagePropagatedNotif(data.at(0).toString(), data.at(1).toString(), data.at(2).toLongLong());
     });
 
     m_logos->delivery_module.on("messageError", [this](const QVariantList& data) {
         if (data.size() < 4) return;
-        emit messageErrorNotif(data.at(0).toString(), data.at(1).toString(), data.at(2).toString(), data.at(3).toString());
+        emit messageErrorNotif(data.at(0).toString(), data.at(1).toString(), data.at(2).toString(), data.at(3).toLongLong());
     });
 }
 
 void LogosDeliveryDemoPlugin::bootstrapNode()
 {
-    // Pick a random port shift so two demo instances on one machine don't
-    // collide on tcp/rest/metrics/discv5/websocket ports. Temporary — once
-    // https://github.com/logos-co/logos-delivery-module/issues/18 lands,
-    // the host will supply per-instance ports via env vars and the demo
-    // won't need to set portsShift at all.
-    const int portsShift = 100 + static_cast<int>(QRandomGenerator::global()->bounded(4500));
-
+    // No port config: logos-delivery-module defaults unspecified ports to 0, so
+    // the OS assigns free ports and two demo instances on one machine don't
+    // collide — no port-shift workaround needed.
     QJsonObject cfg{
         {"logLevel", "INFO"},
         {"mode", "Core"},
-        {"preset", "logos.dev"},
-        {"portsShift", portsShift}
+        {"preset", "logos.dev"}
     };
     const QString cfgJson = QString::fromUtf8(QJsonDocument(cfg).toJson(QJsonDocument::Compact));
-    qInfo() << "logos_delivery_demo: createNode portsShift=" << portsShift;
-    setPortsShift(portsShift);
+    qInfo() << "logos_delivery_demo: createNode" << cfgJson;
 
     LogosResult create = m_logos->delivery_module.createNode(cfgJson);
     if (!create.success) {
@@ -99,11 +99,15 @@ void LogosDeliveryDemoPlugin::bootstrapNode()
         return;
     }
 
+    qInfo() << "logos_delivery_demo: createNode succeeded, starting node...";
+
     LogosResult started = m_logos->delivery_module.start();
     if (!started.success) {
         setLastError(QStringLiteral("start failed: %1").arg(started.getError()));
         return;
     }
+
+    qInfo() << "logos_delivery_demo: Node started successfully";
 
     setNodeReady(true);
 
@@ -170,10 +174,14 @@ QString LogosDeliveryDemoPlugin::unsubscribe(QString topic)
     return QString();
 }
 
-QString LogosDeliveryDemoPlugin::sendMessage(QString topic, QString text)
+QString LogosDeliveryDemoPlugin::sendMessage(QString topic, QString payloadHex)
 {
     if (!m_logos) return QStringLiteral("Backend not initialised");
-    LogosResult r = m_logos->delivery_module.send(topic, text);
+    // The payload is arbitrary bytes; the UI provides them as a hex string.
+    // send()'s payload arg is a QVariant carrying a QByteArray — pass the raw
+    // bytes so they cross unchanged (a QString would be re-encoded as UTF-8).
+    const QByteArray payload = QByteArray::fromHex(payloadHex.toLatin1());
+    LogosResult r = m_logos->delivery_module.send(topic, payload);
     if (!r.success) {
         setLastError(QStringLiteral("send(%1) failed: %2").arg(topic, r.getError()));
         return QString();

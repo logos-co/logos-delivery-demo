@@ -16,7 +16,7 @@ Pinned to `logos-delivery-module` [**`v0.1.1`**](https://github.com/logos-co/log
 - Polling `delivery_module.getNodeInfo(...)` for my peer ID (`MyPeerId`) and peer count (parsed from the `Metrics` Prometheus text, `libp2p_peers` gauge) every 3s, and reading the `logos-delivery` library version once at startup (`getNodeInfo("Version")`)
 - Surfacing `connectionStateChanged` as a live status badge
 - A **global event log** that renders every observed event verbatim — `messageReceived`, `messageSent`, `messagePropagated`, `messageError`, plus the local return values of `subscribe()` / `unsubscribe()` / `send()` — colour-coded by event kind, with every field selectable so you can copy hashes, topics, payloads, request ids
-- A **method-call playground** at the bottom: one row per public `delivery_module` API call (`subscribe`, `unsubscribe`, `send`), rendered as `methodName(arg…)` with a `Call` button — every interaction is reflected as a row in the event log above
+- A **method-call playground** at the bottom: one row per public `delivery_module` API call (`subscribe`, `unsubscribe`, `send`), rendered as `methodName(arg…)` with a `Call` button — every interaction is reflected as a row in the event log above. Message payloads are raw **bytes**: enter them as hex when sending, and received payloads are shown as hex
 - An info `?` chip next to every interactive element with a tooltip spelling out the exact `delivery_module` call behind it — the demo doubles as live API documentation
 - Using **[`Logos.Theme`](https://github.com/logos-co/logos-design-system) and `Logos.Controls`** for tokens, colors, and themed components — no hard-coded styling in the demo
 
@@ -66,9 +66,7 @@ The demo hardcodes the **`logos.dev`** preset for the underlying `createNode` ca
 
 ### Running multiple instances on one machine
 
-Run `nix run` twice in separate terminals — subscribe both to the same content topic, send from one, and the other will fire `messageReceived`. Each instance picks a random `portsShift` value and passes it to `createNode`, so the underlying waku listeners (TCP, discv5, …) don't collide.
-
-> **Note.** Generating a random `portsShift` in the demo is a temporary workaround. It will go away once [`logos-delivery-module#18`](https://github.com/logos-co/logos-delivery-module/issues/18) lands — the module will then expose env-var overrides for each listening port and the host (e.g. basecamp profiles) will assign unique ports per instance without the consumer caring.
+Run `nix run` twice in separate terminals — subscribe both to the same content topic, send from one, and the other will fire `messageReceived`. The demo specifies no ports, so `logos-delivery-module` defaults them to `0` and the OS assigns free ports per instance — the underlying waku listeners (TCP, discv5, …) don't collide.
 
 ## References
 
