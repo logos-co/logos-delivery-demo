@@ -17,7 +17,7 @@ Item {
     readonly property string monoFont: "monospace"
 
     // Single global event log. Each entry is an observed event:
-    //   { eventName, direction, topic, payload, hash, requestId, errorText, ts }
+    //   { eventName, direction, config, topic, payload, hash, requestId, errorText, ts }
     property var events: []
 
     readonly property string nodeStatus:    backend ? backend.connectionStatus : "no backend"
@@ -96,7 +96,7 @@ Item {
                 root.logEvent({
                     eventName: "createNode() returned",
                     direction: "local",
-                    topic: preset + " / " + mode,
+                    config: preset + " / " + mode,
                     errorText: errStr || ""
                 })
             },
@@ -704,6 +704,7 @@ Item {
                 }
             }
 
+            FieldRow { name: "config";    value: evt ? evt.config    || "" : ""; mono: true }
             FieldRow { name: "topic";     value: evt ? evt.topic     || "" : ""; mono: true }
             FieldRow { name: "payload (hex)"; value: evt ? evt.payload || "" : ""; mono: true; multiline: true }
             FieldRow { name: "hash";      value: evt ? evt.hash      || "" : ""; mono: true }
