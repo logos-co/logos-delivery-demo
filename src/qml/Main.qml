@@ -193,7 +193,28 @@ Item {
 
                     LogosBadge {
                         text: root.nodeReady ? root.nodeStatus : "no node — call createNode"
-                        color: root.nodeReady ? Theme.palette.success : Theme.palette.textSecondary
+                        // Health from the node's connectionStateChanged event:
+                        // Connected → green, PartiallyConnected → yellow,
+                        // Disconnected → red; anything else (e.g. before the
+                        // node exists) is neutral.
+                        color: !root.nodeReady                              ? Theme.palette.textSecondary
+                             : root.nodeStatus === "Connected"             ? Theme.palette.success
+                             : root.nodeStatus === "PartiallyConnected"    ? Theme.palette.warning
+                             : root.nodeStatus === "Disconnected"          ? Theme.palette.error
+                             :                                               Theme.palette.textSecondary
+                    }
+                    InfoChip {
+                        tip: "<b>Connection status</b> — the node's health, surfaced from "
+                           + "<code>delivery_module</code>'s <code>connectionStateChanged</code> "
+                           + "event. Possible states:<br><br>"
+                           + "<code>Connected</code> — healthy relay connectivity "
+                           + "(green).<br>"
+                           + "<code>PartiallyConnected</code> — connected to some peers but "
+                           + "below the healthy relay threshold (yellow).<br>"
+                           + "<code>Disconnected</code> — no usable relay connectivity "
+                           + "(red).<br><br>"
+                           + "Until the node is created the badge reads "
+                           + "<i>no node — call createNode</i>."
                     }
                 }
 
