@@ -4,7 +4,7 @@ A small `ui_qml` module that demonstrates **how an application uses [`logos-deli
 
 This repo is the runnable companion to the journey doc [**Use the Logos Delivery module API from an app**](https://github.com/logos-co/logos-docs/blob/main/docs/messaging/journeys/use-the-logos-delivery-module-api-from-an-app.md) — every code path in the doc is exercised here, and every interactive control has an info button explaining which `delivery_module` API call it triggers.
 
-Pinned to `logos-delivery-module` [**`v0.1.1`**](https://github.com/logos-co/logos-delivery-module/tree/v0.1.1).
+Pinned to `logos-delivery-module` [**`v0.1.2`**](https://github.com/logos-co/logos-delivery-module/tree/v0.1.2).
 
 ![Screenshot of the demo running on logos.dev](docs/screenshot.png)
 
@@ -46,7 +46,7 @@ lgpm install ./result/logos-logos_delivery_demo-module.lgx --to ./modules
 
 ```
 logos-delivery-demo/
-├── flake.nix                            # pins delivery_module to v0.1.1
+├── flake.nix                            # pins delivery_module to v0.1.2
 ├── metadata.json                        # type: ui_qml, deps: [delivery_module]
 ├── CMakeLists.txt
 └── src/
@@ -71,7 +71,7 @@ Run `nix run` twice in separate terminals — subscribe both to the same content
 ## References
 
 - [Journey doc — Use the Logos Delivery module API from an app](https://github.com/logos-co/logos-docs/blob/main/docs/messaging/journeys/use-the-logos-delivery-module-api-from-an-app.md)
-- [`logos-delivery-module` @ v0.1.1](https://github.com/logos-co/logos-delivery-module/tree/v0.1.1)
+- [`logos-delivery-module` @ v0.1.2](https://github.com/logos-co/logos-delivery-module/tree/v0.1.2)
 - [`logos-module-builder` — the Nix flake library this demo builds with](https://github.com/logos-co/logos-module-builder)
 - [Logos module developer guide](https://github.com/logos-co/logos-tutorial/blob/master/logos-developer-guide.md) — full walkthrough of module dev, `LogosResult`, generated wrappers
 - [LIP-23 — content topic format](https://lip.logos.co/messaging/informational/23/topics.html)
