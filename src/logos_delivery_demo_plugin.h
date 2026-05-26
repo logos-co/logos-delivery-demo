@@ -28,6 +28,7 @@ public:
 
     Q_INVOKABLE void initLogos(LogosAPI* api);
 
+    QString createNode(QString preset, QString mode) override;
     QString subscribe(QString topic) override;
     QString unsubscribe(QString topic) override;
     QString sendMessage(QString topic, QString payloadHex) override;
@@ -37,7 +38,6 @@ signals:
 
 private:
     void wireEvents();
-    void bootstrapNode();
     void refreshNodeInfo();
 
     LogosAPI* m_logosAPI = nullptr;

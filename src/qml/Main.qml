@@ -10,14 +10,19 @@ Item {
 
     readonly property var backend: logos.module("logos_delivery_demo")
 
+    // Monospace family for code-like values (peer ids, hashes, topics,
+    // payloads, request ids, timestamps, method signatures). The design system
+    // ships no mono token, so centralise the generic family here — Qt maps
+    // "monospace" to the platform's fixed-pitch font.
+    readonly property string monoFont: "monospace"
+
     // Single global event log. Each entry is an observed event:
-    //   { eventName, direction, topic, payload, hash, requestId, errorText, ts }
+    //   { eventName, direction, config, topic, payload, hash, requestId, errorText, ts }
     property var events: []
 
     readonly property string nodeStatus:    backend ? backend.connectionStatus : "no backend"
     readonly property bool   nodeReady:     backend ? backend.nodeReady       : false
     readonly property string peerIdValue:   backend ? backend.peerId          : ""
-    readonly property int    peerCountValue: backend ? backend.peerCount      : 0
     readonly property string lastErrorValue: backend ? backend.lastError      : ""
     readonly property string deliveryVersionValue: backend ? backend.deliveryVersion : ""
 
@@ -73,7 +78,31 @@ Item {
         Qt.callLater(eventView.positionViewAtEnd)
     }
 
+    // Event timestamps arrive as a qint64 of nanoseconds since the Unix epoch.
+    // Convert to milliseconds for a JS Date and render as readable local time.
+    // (ns exceeds JS's safe-integer range, but ms is comfortably within it and
+    //  the lost sub-millisecond precision doesn't matter for display.)
+    function formatTs(ts) {
+        if (!ts) return ""
+        return Qt.formatDateTime(new Date(Math.floor(ts / 1000000)), "yyyy-MM-dd hh:mm:ss.zzz")
+    }
+
     // ── Method-call invocations (logged as local events) ──────────────────────
+
+    function callCreateNode(preset, mode) {
+        if (!preset || !mode) return
+        logos.watch(backend.createNode(preset, mode),
+            function(errStr) {
+                root.logEvent({
+                    eventName: "createNode() returned",
+                    direction: "local",
+                    config: preset + " / " + mode,
+                    errorText: errStr || ""
+                })
+            },
+            function(_e) {}
+        )
+    }
 
     function callSubscribe(topic) {
         if (!topic) return
@@ -161,7 +190,7 @@ Item {
                     SelectableValue {
                         text: "logos-delivery " + root.deliveryVersionValue
                         visible: root.deliveryVersionValue.length > 0
-                        font.family: "monospace"
+                        font.family: root.monoFont
                         font.pixelSize: Theme.typography.secondaryText
                         color: Theme.palette.textSecondary
                         wrapMode: TextEdit.NoWrap
@@ -178,19 +207,29 @@ Item {
                     Item { Layout.fillWidth: true }
 
                     LogosBadge {
-                        text: root.nodeReady ? root.nodeStatus : "starting…"
-                        color: root.nodeReady ? Theme.palette.success : Theme.palette.warning
-                    }
-
-                    LogosBadge {
-                        text: "peers: " + root.peerCountValue
-                        color: root.peerCountValue > 0 ? Theme.palette.success : Theme.palette.textSecondary
+                        text: root.nodeReady ? root.nodeStatus : "no node — call createNode"
+                        // Health from the node's connectionStateChanged event:
+                        // Connected → green, PartiallyConnected → yellow,
+                        // Disconnected → red; anything else (e.g. before the
+                        // node exists) is neutral.
+                        color: !root.nodeReady                              ? Theme.palette.textSecondary
+                             : root.nodeStatus === "Connected"             ? Theme.palette.success
+                             : root.nodeStatus === "PartiallyConnected"    ? Theme.palette.warning
+                             : root.nodeStatus === "Disconnected"          ? Theme.palette.error
+                             :                                               Theme.palette.textSecondary
                     }
                     InfoChip {
-                        tip: "<b>peers</b> — number of currently-connected libp2p peers.<br><br>"
-                           + "Polled every 3 seconds from "
-                           + "<code>delivery_module.getNodeInfo(\"Metrics\")</code> "
-                           + "and parsed out of the <code>libp2p_peers</code> Prometheus gauge."
+                        tip: "<b>Connection status</b> — the node's health, surfaced from "
+                           + "<code>delivery_module</code>'s <code>connectionStateChanged</code> "
+                           + "event. Possible states:<br><br>"
+                           + "<code>Connected</code> — healthy relay connectivity "
+                           + "(green).<br>"
+                           + "<code>PartiallyConnected</code> — connected to some peers but "
+                           + "below the healthy relay threshold (yellow).<br>"
+                           + "<code>Disconnected</code> — no usable relay connectivity "
+                           + "(red).<br><br>"
+                           + "Until the node is created the badge reads "
+                           + "<i>no node — call createNode</i>."
                     }
                 }
 
@@ -207,7 +246,7 @@ Item {
                         text: root.peerIdValue.length > 0
                               ? root.peerIdValue
                               : "(not available yet)"
-                        font.family: "monospace"
+                        font.family: root.monoFont
                         wrapMode: TextEdit.NoWrap
                         clip: true
                         Layout.fillWidth: true
@@ -215,7 +254,7 @@ Item {
                     InfoChip {
                         tip: "<b>Peer ID</b> — this node's local libp2p peer identifier.<br><br>"
                            + "Returned by <code>delivery_module.getNodeInfo(\"MyPeerId\")</code>, "
-                           + "polled every 3 seconds together with the peer count."
+                           + "polled every 3 seconds."
                     }
                 }
 
@@ -260,12 +299,6 @@ Item {
                         text: "Event log"
                         font.pixelSize: Theme.typography.subtitleText
                         font.weight: Theme.typography.weightBold
-                        Layout.fillWidth: true
-                    }
-                    LogosText {
-                        text: root.events.length + " event" + (root.events.length === 1 ? "" : "s")
-                        font.pixelSize: Theme.typography.secondaryText
-                        color: Theme.palette.textSecondary
                     }
                     InfoChip {
                         tip: "<b>Event log</b> — every observed event in order, across all topics.<br><br>"
@@ -273,8 +306,25 @@ Item {
                            + "<code>messageSent</code> — our outgoing message was accepted by the local node.<br>"
                            + "<code>messagePropagated</code> — the message was relayed to the network.<br>"
                            + "<code>messageError</code> — the outgoing message failed.<br>"
-                           + "<code>subscribe()</code> / <code>unsubscribe()</code> / <code>send() returned</code> — "
+                           + "<code>createNode()</code> / <code>subscribe()</code> / <code>unsubscribe()</code> / <code>send() returned</code> — "
                            + "the immediate return value of the local API call (logged here so the demo is a faithful trace)."
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    LogosText {
+                        text: root.events.length + " event" + (root.events.length === 1 ? "" : "s")
+                        font.pixelSize: Theme.typography.secondaryText
+                        color: Theme.palette.textSecondary
+                    }
+                    LogosButton {
+                        text: "Clear"
+                        enabled: root.events.length > 0
+                        Layout.preferredWidth: 56
+                        Layout.preferredHeight: 28
+                        implicitWidth: 56
+                        implicitHeight: 28
+                        onClicked: root.events = []
                     }
                 }
 
@@ -294,6 +344,21 @@ Item {
         ColumnLayout {
             Layout.fillWidth: true
             spacing: Theme.spacing.small
+
+            CreateNodeCall {
+                callEnabled: root.backend && !root.nodeReady
+                infoTip: "<b>delivery_module.createNode(config)</b> + <b>start()</b><br><br>"
+                       + "Create and start the node against a chosen network.<br>"
+                       + "<b>preset</b> — <code>logos.dev</code> (Logos Dev Network) or "
+                       + "<code>logos.test</code> (Logos Test Network); both auto-configure "
+                       + "cluster id, entry nodes, sharding and RLN.<br>"
+                       + "<b>mode</b> — <code>Core</code> (full relay node) or "
+                       + "<code>Edge</code> (light/edge node).<br><br>"
+                       + "The node is no longer started automatically, so you can exercise "
+                       + "the module against different fleets and modes. Can be called once "
+                       + "per session."
+                onCall: function(preset, mode) { root.callCreateNode(preset, mode) }
+            }
 
             MethodCall {
                 methodName: "subscribe"
@@ -427,14 +492,14 @@ Item {
 
             LogosText {
                 text: mc.methodName
-                font.family: "monospace"
+                font.family: root.monoFont
                 font.pixelSize: Theme.typography.primaryText
                 font.weight: Theme.typography.weightBold
                 color: Theme.palette.primary
             }
             LogosText {
                 text: "("
-                font.family: "monospace"
+                font.family: root.monoFont
                 font.pixelSize: Theme.typography.primaryText
                 color: Theme.palette.textSecondary
             }
@@ -451,7 +516,7 @@ Item {
             LogosText {
                 visible: mc.hasArg2
                 text: ","
-                font.family: "monospace"
+                font.family: root.monoFont
                 font.pixelSize: Theme.typography.primaryText
                 color: Theme.palette.textSecondary
             }
@@ -469,7 +534,7 @@ Item {
             }
             LogosText {
                 text: ")"
-                font.family: "monospace"
+                font.family: root.monoFont
                 font.pixelSize: Theme.typography.primaryText
                 color: Theme.palette.textSecondary
             }
@@ -488,6 +553,86 @@ Item {
         }
     }
 
+    // ── createNode playground row ─────────────────────────────────────────────
+    // Like MethodCall, but the two arguments are fixed-choice enums, so they are
+    // picked from dropdowns rather than typed:
+    //   createNode ( [logos.dev ▾], [Core ▾] ) [Call] [?]
+    component CreateNodeCall: Rectangle {
+        id: cn
+
+        property string infoTip: ""
+        property bool   callEnabled: true
+
+        signal call(string preset, string mode)
+
+        Layout.fillWidth: true
+        Layout.preferredHeight: cnRow.implicitHeight + Theme.spacing.medium * 2
+        color: Theme.palette.backgroundSecondary
+        radius: Theme.spacing.radiusMedium
+        border.width: 1
+        border.color: Theme.palette.borderHairline
+
+        RowLayout {
+            id: cnRow
+            anchors.fill: parent
+            anchors.margins: Theme.spacing.medium
+            spacing: Theme.spacing.tiny
+
+            LogosText {
+                text: "createNode"
+                font.family: root.monoFont
+                font.pixelSize: Theme.typography.primaryText
+                font.weight: Theme.typography.weightBold
+                color: Theme.palette.primary
+            }
+            LogosText {
+                text: "("
+                font.family: root.monoFont
+                font.pixelSize: Theme.typography.primaryText
+                color: Theme.palette.textSecondary
+            }
+            LogosComboBox {
+                id: presetBox
+                // logos.test is the default fleet.
+                model: ["logos.test", "logos.dev"]
+                currentIndex: 0
+                enabled: cn.callEnabled
+                Layout.fillWidth: true
+                Layout.minimumWidth: 120
+            }
+            LogosText {
+                text: ","
+                font.family: root.monoFont
+                font.pixelSize: Theme.typography.primaryText
+                color: Theme.palette.textSecondary
+            }
+            LogosComboBox {
+                id: modeBox
+                model: ["Core", "Edge"]
+                currentIndex: 0
+                enabled: cn.callEnabled
+                Layout.fillWidth: true
+                Layout.minimumWidth: 120
+            }
+            LogosText {
+                text: ")"
+                font.family: root.monoFont
+                font.pixelSize: Theme.typography.primaryText
+                color: Theme.palette.textSecondary
+            }
+            LogosButton {
+                text: "Call"
+                Layout.preferredWidth: 72
+                Layout.preferredHeight: 40
+                implicitWidth: 72
+                implicitHeight: 40
+                enabled: cn.callEnabled
+                onClicked: cn.call(presetBox.currentText, modeBox.currentText)
+            }
+            InfoChip { tip: cn.infoTip }
+        }
+    }
+
     // Developer-facing event row. Renders every field of the event verbatim.
     component MessageItem: Rectangle {
         property var evt
@@ -498,6 +643,7 @@ Item {
                 case "messageSent":        return Theme.palette.textSecondary
                 case "messagePropagated":  return Theme.palette.success
                 case "messageError":       return Theme.palette.error
+                case "createNode() returned":
                 case "subscribe() returned":
                 case "unsubscribe() returned":
                 case "send() returned":    return Theme.palette.primary
@@ -549,16 +695,17 @@ Item {
                 }
                 Item { Layout.fillWidth: true }
                 SelectableValue {
-                    text: evt && evt.ts ? evt.ts : ""
+                    text: evt && evt.ts ? root.formatTs(evt.ts) : ""
                     visible: text.length > 0
-                    font.family: "monospace"
+                    font.family: root.monoFont
                     font.pixelSize: Theme.typography.secondaryText
                     color: Theme.palette.textSecondary
                     wrapMode: TextEdit.NoWrap
                 }
             }
 
-            FieldRow { name: "topic";     value: evt ? evt.topic     || "" : "" }
+            FieldRow { name: "config";    value: evt ? evt.config    || "" : ""; mono: true }
+            FieldRow { name: "topic";     value: evt ? evt.topic     || "" : ""; mono: true }
             FieldRow { name: "payload (hex)"; value: evt ? evt.payload || "" : ""; mono: true; multiline: true }
             FieldRow { name: "hash";      value: evt ? evt.hash      || "" : ""; mono: true }
             FieldRow { name: "requestId"; value: evt ? evt.requestId || "" : ""; mono: true }
@@ -589,7 +736,7 @@ Item {
         }
         SelectableValue {
             text: value
-            font.family: mono ? "monospace" : Theme.typography.publicSans
+            font.family: mono ? root.monoFont : Theme.typography.publicSans
             color: isError ? Theme.palette.error : Theme.palette.text
             wrapMode: multiline ? TextEdit.WrapAnywhere : TextEdit.NoWrap
             Layout.fillWidth: true

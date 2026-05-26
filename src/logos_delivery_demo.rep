@@ -4,7 +4,6 @@ class LogosDeliveryDemo
     PROP(bool nodeReady=false READONLY)
     PROP(QString lastError="" READONLY)
     PROP(QString peerId="" READONLY)
-    PROP(int peerCount=0 READONLY)
     PROP(QString deliveryVersion="" READONLY)
 
     SIGNAL(messageReceived(QString topic, QString payload, QString messageHash, qint64 timestamp))
@@ -12,6 +11,7 @@ class LogosDeliveryDemo
     SIGNAL(messagePropagatedNotif(QString requestId, QString messageHash, qint64 timestamp))
     SIGNAL(messageErrorNotif(QString requestId, QString messageHash, QString errorText, qint64 timestamp))
 
+    SLOT(QString createNode(QString preset, QString mode))
     SLOT(QString subscribe(QString topic))
     SLOT(QString unsubscribe(QString topic))
     SLOT(QString sendMessage(QString topic, QString payloadHex))
