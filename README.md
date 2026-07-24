@@ -6,7 +6,7 @@ A small `ui_qml` module that demonstrates **how an application uses [`logos-deli
 
 This repo is the runnable companion to the journey doc [**Use the Logos Delivery module API from an app**](https://github.com/logos-co/logos-docs/blob/main/docs/messaging/journeys/use-the-logos-delivery-module-api-from-an-app.md) — every code path in the doc is exercised here, and every interactive control has an info button explaining which `delivery_module` API call it triggers.
 
-Pinned to `logos-delivery-module` [**`v0.1.3`**](https://github.com/logos-co/logos-delivery-module/tree/v0.1.3).
+Pinned to `logos-delivery-module` [**PR #68 — Reliable Channels API**](https://github.com/logos-co/logos-delivery-module/pull/68) (rev `0fb3a74`), until the channel API lands in a release tag.
 
 ![Screenshot of the demo running on logos.dev](docs/screenshot.png)
 
@@ -17,8 +17,9 @@ Pinned to `logos-delivery-module` [**`v0.1.3`**](https://github.com/logos-co/log
 - Bootstrapping the node from the UI with `createNode(...)` and `start()`, with `LogosResult` checks — the fleet (`logos.test` / `logos.dev`, defaulting to `logos.test`) and node mode (`Core` / `Edge`) are picked from dropdowns
 - Polling `delivery_module.getNodeInfo("MyPeerId")` for my peer ID every 3s, and reading the `logos-delivery` library version once at startup (`getNodeInfo("Version")`)
 - Surfacing `connectionStateChanged` as a live status badge
-- A **global event log** that renders every observed event verbatim — `messageReceived`, `messageSent`, `messagePropagated`, `messageError`, plus the local return values of `createNode()` / `subscribe()` / `unsubscribe()` / `send()` — colour-coded by event kind, with every field selectable so you can copy hashes, topics, payloads, request ids
-- A **method-call playground** at the bottom: one row per public `delivery_module` API call (`createNode`, `subscribe`, `unsubscribe`, `send`), rendered as `methodName(arg…)` with a `Call` button — every interaction is reflected as a row in the event log above. `createNode`'s two arguments are fixed-choice enums picked from dropdowns; message payloads are raw **bytes**: enter them as hex when sending, and received payloads are shown as hex
+- The **Reliable Channels API**: `channelCreate(channelId, contentTopic, senderId)` / `channelExists` / `channelSend` / `channelClose`, with the `channelMessageReceived` / `channelMessageSent` / `channelMessageError` events surfaced in the event log
+- A **global event log** that renders every observed event verbatim — `messageReceived`, `messageSent`, `messagePropagated`, `messageError`, `channelMessageReceived`, `channelMessageSent`, `channelMessageError`, plus the local return values of every playground call — colour-coded by event kind, with every field selectable so you can copy hashes, topics, payloads, request ids
+- A **method-call playground** at the bottom: one row per public `delivery_module` API call (`createNode`, `subscribe`, `unsubscribe`, `send`, `channelCreate`, `channelExists`, `channelSend`, `channelClose`), rendered as `methodName(arg…)` with a `Call` button — every interaction is reflected as a row in the event log above. `createNode`'s two arguments are fixed-choice enums picked from dropdowns; message payloads are raw **bytes**: enter them as hex when sending, and received payloads are shown as hex
 - An info `?` chip next to every interactive element with a tooltip spelling out the exact `delivery_module` call behind it — the demo doubles as live API documentation
 - Using **[`Logos.Theme`](https://github.com/logos-co/logos-design-system) and `Logos.Controls`** for tokens, colors, and themed components — no hard-coded styling in the demo
 
@@ -48,7 +49,7 @@ lgpm install ./result/logos-logos_delivery_demo-module.lgx --to ./modules
 
 ```
 logos-delivery-demo/
-├── flake.nix                            # pins delivery_module to v0.1.3
+├── flake.nix                            # pins delivery_module to PR #68 (Reliable Channels API)
 ├── metadata.json                        # type: ui_qml, deps: [delivery_module]
 ├── CMakeLists.txt
 └── src/
@@ -73,7 +74,7 @@ Run `nix run` twice in separate terminals — subscribe both to the same content
 ## References
 
 - [Journey doc — Use the Logos Delivery module API from an app](https://github.com/logos-co/logos-docs/blob/main/docs/messaging/journeys/use-the-logos-delivery-module-api-from-an-app.md)
-- [`logos-delivery-module` @ v0.1.3](https://github.com/logos-co/logos-delivery-module/tree/v0.1.3)
+- [`logos-delivery-module` PR #68 — Reliable Channels API](https://github.com/logos-co/logos-delivery-module/pull/68)
 - [`logos-module-builder` — the Nix flake library this demo builds with](https://github.com/logos-co/logos-module-builder)
 - [Logos module developer guide](https://github.com/logos-co/logos-tutorial/blob/master/logos-developer-guide.md) — full walkthrough of module dev, `LogosResult`, generated wrappers
 - [LIP-23 — content topic format](https://lip.logos.co/messaging/informational/23/topics.html)

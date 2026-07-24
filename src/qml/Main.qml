@@ -68,6 +68,35 @@ Item {
                 ts: timestamp
             })
         }
+        function onChannelMessageReceived(channelId, senderId, payload, timestamp) {
+            root.logEvent({
+                eventName: "channelMessageReceived",
+                direction: "in",
+                channelId: channelId,
+                senderId: senderId,
+                payload: payload,
+                ts: timestamp
+            })
+        }
+        function onChannelMessageSentNotif(channelId, requestId, timestamp) {
+            root.logEvent({
+                eventName: "channelMessageSent",
+                direction: "out",
+                channelId: channelId,
+                requestId: requestId,
+                ts: timestamp
+            })
+        }
+        function onChannelMessageErrorNotif(channelId, requestId, errorText, timestamp) {
+            root.logEvent({
+                eventName: "channelMessageError",
+                direction: "out",
+                channelId: channelId,
+                requestId: requestId,
+                errorText: errorText,
+                ts: timestamp
+            })
+        }
     }
 
     function logEvent(evt) {
@@ -144,6 +173,69 @@ Item {
                     topic: topic,
                     payload: payload,
                     requestId: requestId || "(empty — see lastError)"
+                })
+            },
+            function(_e) {}
+        )
+    }
+
+    function callChannelCreate(channelId, contentTopic, senderId) {
+        if (!channelId || !contentTopic || !senderId) return
+        logos.watch(backend.channelCreate(channelId, contentTopic, senderId),
+            function(errStr) {
+                root.logEvent({
+                    eventName: "channelCreate() returned",
+                    direction: "local",
+                    channelId: channelId,
+                    topic: contentTopic,
+                    senderId: senderId,
+                    errorText: errStr || ""
+                })
+            },
+            function(_e) {}
+        )
+    }
+
+    function callChannelExists(channelId) {
+        if (!channelId) return
+        logos.watch(backend.channelExists(channelId),
+            function(result) {
+                root.logEvent({
+                    eventName: "channelExists() returned",
+                    direction: "local",
+                    channelId: channelId,
+                    result: result || "(empty — see lastError)"
+                })
+            },
+            function(_e) {}
+        )
+    }
+
+    function callChannelSend(channelId, payload) {
+        if (!channelId || !payload) return
+        logos.watch(backend.channelSend(channelId, payload),
+            function(requestId) {
+                root.logEvent({
+                    eventName: "channelSend() returned",
+                    direction: "local",
+                    channelId: channelId,
+                    payload: payload,
+                    requestId: requestId || "(empty — see lastError)"
+                })
+            },
+            function(_e) {}
+        )
+    }
+
+    function callChannelClose(channelId) {
+        if (!channelId) return
+        logos.watch(backend.channelClose(channelId),
+            function(errStr) {
+                root.logEvent({
+                    eventName: "channelClose() returned",
+                    direction: "local",
+                    channelId: channelId,
+                    errorText: errStr || ""
                 })
             },
             function(_e) {}
@@ -306,7 +398,11 @@ Item {
                            + "<code>messageSent</code> — our outgoing message was accepted by the local node.<br>"
                            + "<code>messagePropagated</code> — the message was relayed to the network.<br>"
                            + "<code>messageError</code> — the outgoing message failed.<br>"
-                           + "<code>createNode()</code> / <code>subscribe()</code> / <code>unsubscribe()</code> / <code>send() returned</code> — "
+                           + "<code>channelMessageReceived</code> — a peer sent us a message on a reliable channel.<br>"
+                           + "<code>channelMessageSent</code> — every segment of a channel send was confirmed.<br>"
+                           + "<code>channelMessageError</code> — a channel send finalised with a failed segment.<br>"
+                           + "<code>createNode()</code> / <code>subscribe()</code> / <code>unsubscribe()</code> / <code>send()</code> / "
+                           + "<code>channelCreate()</code> / <code>channelExists()</code> / <code>channelSend()</code> / <code>channelClose() returned</code> — "
                            + "the immediate return value of the local API call (logged here so the demo is a faithful trace)."
                     }
 
@@ -393,6 +489,62 @@ Item {
                        + "asynchronously and carry the same request id."
                 onCall: function(arg1, arg2) { root.callSend(arg1, arg2) }
             }
+
+            MethodCall {
+                methodName: "channelCreate"
+                arg1Name: "channelId"
+                arg2Name: "contentTopic"
+                arg3Name: "senderId"
+                callEnabled: root.nodeReady
+                infoTip: "<b>delivery_module.channelCreate(channelId, contentTopic, senderId)</b><br><br>"
+                       + "Create (or re-open) a <b>reliable channel</b> on a content topic.<br>"
+                       + "<b>channelId</b> — application-chosen channel identifier; both peers "
+                       + "must use the same id.<br>"
+                       + "<b>contentTopic</b> — the content topic the channel communicates on.<br>"
+                       + "<b>senderId</b> — this participant's SDS (Scalable Data Sync) sender "
+                       + "identifier; any string unique per participant (e.g. your peer id).<br><br>"
+                       + "Persisted channel state survives <code>channelClose()</code>, so "
+                       + "re-creating a channel with the same id restores it."
+                onCall: function(arg1, arg2, arg3) { root.callChannelCreate(arg1, arg2, arg3) }
+            }
+
+            MethodCall {
+                methodName: "channelExists"
+                arg1Name: "channelId"
+                callEnabled: root.nodeReady
+                infoTip: "<b>delivery_module.channelExists(channelId)</b><br><br>"
+                       + "Check whether a reliable channel is currently open. An unknown "
+                       + "channel id is not an error.<br><br>"
+                       + "Returns <code>\"true\"</code> or <code>\"false\"</code> (the verbatim "
+                       + "FFI string), logged as the <code>result</code> field."
+                onCall: function(arg1, _arg2) { root.callChannelExists(arg1) }
+            }
+
+            MethodCall {
+                methodName: "channelSend"
+                arg1Name: "channelId"
+                arg2Name: "payload (hex)"
+                callEnabled: root.nodeReady
+                infoTip: "<b>delivery_module.channelSend(channelId, payload)</b><br><br>"
+                       + "Send a message on a reliable channel. The payload is raw <b>bytes</b> — "
+                       + "enter it as hex, e.g. <code>48 65 6c 6c 6f</code> or <code>48656c6c6f</code>.<br><br>"
+                       + "On success the <code>LogosResult.getString()</code> value is the <b>request id</b>; "
+                       + "<code>channelMessageSent</code> arrives once every segment of the send is "
+                       + "confirmed, or <code>channelMessageError</code> if the send finalises with "
+                       + "a failed segment — both carry the same request id."
+                onCall: function(arg1, arg2) { root.callChannelSend(arg1, arg2) }
+            }
+
+            MethodCall {
+                methodName: "channelClose"
+                arg1Name: "channelId"
+                callEnabled: root.nodeReady
+                infoTip: "<b>delivery_module.channelClose(channelId)</b><br><br>"
+                       + "Close a reliable channel: stops its SDS loops. Persisted state "
+                       + "survives, so <code>channelCreate()</code> with the same id restores "
+                       + "the channel."
+                onCall: function(arg1, _arg2) { root.callChannelClose(arg1) }
+            }
         }
     }
 
@@ -457,20 +609,22 @@ Item {
 
     // ── Method-call playground row ────────────────────────────────────────────
     // Renders as:
-    //   methodName ( [arg1____], [arg2____] ) [Call] [?]
-    // arg2 is optional; if arg2Name is empty, only one field is shown.
+    //   methodName ( [arg1____], [arg2____], [arg3____] ) [Call] [?]
+    // arg2 and arg3 are optional; fields with an empty name are not shown.
     component MethodCall: Rectangle {
         id: mc
 
         property string methodName: ""
         property string arg1Name: ""
         property string arg2Name: ""
+        property string arg3Name: ""
         property string infoTip: ""
         property bool   callEnabled: true
 
-        signal call(string arg1, string arg2)
+        signal call(string arg1, string arg2, string arg3)
 
         readonly property bool hasArg2: arg2Name.length > 0
+        readonly property bool hasArg3: arg3Name.length > 0
 
         Layout.fillWidth: true
         Layout.preferredHeight: row.implicitHeight + Theme.spacing.medium * 2
@@ -481,7 +635,9 @@ Item {
 
         function invoke() {
             if (!mc.callEnabled) return
-            mc.call(arg1Field.text, mc.hasArg2 ? arg2Field.text : "")
+            mc.call(arg1Field.text,
+                    mc.hasArg2 ? arg2Field.text : "",
+                    mc.hasArg3 ? arg3Field.text : "")
         }
 
         RowLayout {
@@ -533,6 +689,25 @@ Item {
                 function onAccepted() { mc.invoke() }
             }
             LogosText {
+                visible: mc.hasArg3
+                text: ","
+                font.family: root.monoFont
+                font.pixelSize: Theme.typography.primaryText
+                color: Theme.palette.textSecondary
+            }
+            LogosTextField {
+                id: arg3Field
+                visible: mc.hasArg3
+                placeholderText: mc.arg3Name
+                Layout.fillWidth: mc.hasArg3
+                Layout.minimumWidth: mc.hasArg3 ? 100 : 0
+            }
+            Connections {
+                target: arg3Field.textInput
+                enabled: mc.hasArg3
+                function onAccepted() { mc.invoke() }
+            }
+            LogosText {
                 text: ")"
                 font.family: root.monoFont
                 font.pixelSize: Theme.typography.primaryText
@@ -547,6 +722,7 @@ Item {
                 enabled: mc.callEnabled
                          && arg1Field.text.length > 0
                          && (!mc.hasArg2 || arg2Field.text.length > 0)
+                         && (!mc.hasArg3 || arg3Field.text.length > 0)
                 onClicked: mc.invoke()
             }
             InfoChip { tip: mc.infoTip }
@@ -639,14 +815,21 @@ Item {
         readonly property color accent: {
             if (!evt) return Theme.palette.textSecondary
             switch (evt.eventName) {
-                case "messageReceived":    return Theme.palette.info
-                case "messageSent":        return Theme.palette.textSecondary
-                case "messagePropagated":  return Theme.palette.success
-                case "messageError":       return Theme.palette.error
+                case "messageReceived":        return Theme.palette.info
+                case "channelMessageReceived": return Theme.palette.info
+                case "messageSent":            return Theme.palette.textSecondary
+                case "messagePropagated":      return Theme.palette.success
+                case "channelMessageSent":     return Theme.palette.success
+                case "messageError":           return Theme.palette.error
+                case "channelMessageError":    return Theme.palette.error
                 case "createNode() returned":
                 case "subscribe() returned":
                 case "unsubscribe() returned":
-                case "send() returned":    return Theme.palette.primary
+                case "send() returned":
+                case "channelCreate() returned":
+                case "channelExists() returned":
+                case "channelSend() returned":
+                case "channelClose() returned": return Theme.palette.primary
             }
             return Theme.palette.textSecondary
         }
@@ -705,10 +888,13 @@ Item {
             }
 
             FieldRow { name: "config";    value: evt ? evt.config    || "" : ""; mono: true }
+            FieldRow { name: "channelId"; value: evt ? evt.channelId || "" : ""; mono: true }
+            FieldRow { name: "senderId";  value: evt ? evt.senderId  || "" : ""; mono: true }
             FieldRow { name: "topic";     value: evt ? evt.topic     || "" : ""; mono: true }
             FieldRow { name: "payload (hex)"; value: evt ? evt.payload || "" : ""; mono: true; multiline: true }
             FieldRow { name: "hash";      value: evt ? evt.hash      || "" : ""; mono: true }
             FieldRow { name: "requestId"; value: evt ? evt.requestId || "" : ""; mono: true }
+            FieldRow { name: "result";    value: evt ? evt.result    || "" : ""; mono: true }
             FieldRow { name: "error";     value: evt ? evt.errorText || "" : ""; isError: true }
         }
     }

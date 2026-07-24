@@ -10,9 +10,16 @@ class LogosDeliveryDemo
     SIGNAL(messageSentNotif(QString requestId, QString messageHash, qint64 timestamp))
     SIGNAL(messagePropagatedNotif(QString requestId, QString messageHash, qint64 timestamp))
     SIGNAL(messageErrorNotif(QString requestId, QString messageHash, QString errorText, qint64 timestamp))
+    SIGNAL(channelMessageReceived(QString channelId, QString senderId, QString payload, qint64 timestamp))
+    SIGNAL(channelMessageSentNotif(QString channelId, QString requestId, qint64 timestamp))
+    SIGNAL(channelMessageErrorNotif(QString channelId, QString requestId, QString errorText, qint64 timestamp))
 
     SLOT(QString createNode(QString preset, QString mode))
     SLOT(QString subscribe(QString topic))
     SLOT(QString unsubscribe(QString topic))
     SLOT(QString sendMessage(QString topic, QString payloadHex))
+    SLOT(QString channelCreate(QString channelId, QString contentTopic, QString senderId))
+    SLOT(QString channelExists(QString channelId))
+    SLOT(QString channelSend(QString channelId, QString payloadHex))
+    SLOT(QString channelClose(QString channelId))
 }
