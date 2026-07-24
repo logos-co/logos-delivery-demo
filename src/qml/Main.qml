@@ -1030,8 +1030,10 @@ Item {
             // payloads arrive as arbitrary bytes and are shown as hex, plus a
             // decoded-text row when the bytes are valid UTF-8 (the backend
             // sends "" otherwise, which self-hides the row).
-            FieldRow { name: "payload";   value: evt ? evt.payload   || "" : ""; mono: true; multiline: true }
-            FieldRow { name: "payload (text)"; value: evt ? evt.payloadText || "" : ""; multiline: true }
+            // 480 chars of space-separated hex ≈ 160 payload bytes — about two
+            // wrapped lines before the ellipsis kicks in.
+            FieldRow { name: "payload";   value: evt ? evt.payload   || "" : ""; mono: true; multiline: true; truncateAt: 480 }
+            FieldRow { name: "payload (text)"; value: evt ? evt.payloadText || "" : ""; multiline: true; truncateAt: 480 }
             FieldRow { name: "hash";      value: evt ? evt.hash      || "" : ""; mono: true }
             FieldRow { name: "requestId"; value: evt ? evt.requestId || "" : ""; mono: true }
             FieldRow { name: "result";    value: evt ? evt.result    || "" : ""; mono: true }
@@ -1045,6 +1047,10 @@ Item {
         property bool   mono: false
         property bool   multiline: false
         property bool   isError: false
+        // Cap runaway values (multi-KiB payloads) at roughly two wrapped
+        // lines, ellipsis-style; 0 shows the full value. The cut prefers the
+        // last space before the limit so a hex byte pair is never split.
+        property int    truncateAt: 0
 
         // Self-hide when the value is empty so events only render fields they
         // actually carry (e.g. messageSent has no topic/payload, subscribe()
@@ -1061,7 +1067,12 @@ Item {
             Layout.alignment: multiline ? Qt.AlignTop : Qt.AlignVCenter
         }
         SelectableValue {
-            text: value
+            text: {
+                if (truncateAt <= 0 || value.length <= truncateAt) return value
+                let cut = value.lastIndexOf(" ", truncateAt)
+                if (cut < truncateAt / 2) cut = truncateAt
+                return value.substring(0, cut) + " …"
+            }
             font.family: mono ? root.monoFont : Theme.typography.publicSans
             color: isError ? Theme.palette.error : Theme.palette.text
             wrapMode: multiline ? TextEdit.WrapAnywhere : TextEdit.NoWrap

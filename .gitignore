@@ -1,1 +1,4 @@
 result
+
+# SDS runtime state written by the running demo (sqlite db)
+data/
