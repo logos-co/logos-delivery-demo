@@ -30,12 +30,13 @@ Item {
         target: backend
         ignoreUnknownSignals: true
 
-        function onMessageReceived(topic, payload, messageHash, timestamp) {
+        function onMessageReceived(topic, payload, payloadText, messageHash, timestamp) {
             root.logEvent({
                 eventName: "messageReceived",
                 direction: "in",
                 topic: topic,
                 payload: payload,
+                payloadText: payloadText,
                 hash: messageHash,
                 ts: timestamp
             })
@@ -68,13 +69,14 @@ Item {
                 ts: timestamp
             })
         }
-        function onChannelMessageReceived(channelId, senderId, payload, timestamp) {
+        function onChannelMessageReceived(channelId, senderId, payload, payloadText, timestamp) {
             root.logEvent({
                 eventName: "channelMessageReceived",
                 direction: "in",
                 channelId: channelId,
                 senderId: senderId,
                 payload: payload,
+                payloadText: payloadText,
                 ts: timestamp
             })
         }
@@ -413,7 +415,7 @@ Item {
                         font.pixelSize: Theme.typography.secondaryText
                         color: Theme.palette.textSecondary
                     }
-                    LogosButton {
+                    DemoButton {
                         text: "Clear"
                         enabled: root.events.length > 0
                         Layout.preferredWidth: 56
@@ -437,6 +439,8 @@ Item {
         }
 
         // ─── Method-call playground ──────────────────────────────────────────
+        // createNode spans the full width on top; below it the per-domain API
+        // calls sit in two side-by-side groups: Messaging and Channels.
         ColumnLayout {
             Layout.fillWidth: true
             spacing: Theme.spacing.small
@@ -456,99 +460,187 @@ Item {
                 onCall: function(preset, mode) { root.callCreateNode(preset, mode) }
             }
 
-            MethodCall {
-                methodName: "subscribe"
-                arg1Name: "contentTopic"
-                callEnabled: root.nodeReady
-                infoTip: "<b>delivery_module.subscribe(contentTopic)</b><br><br>"
-                       + "Tell the node to listen for messages on a libp2p pubsub topic.<br>"
-                       + "Returns a <code>LogosResult</code>; on success the node will start emitting "
-                       + "<code>messageReceived</code> events for that topic."
-                onCall: function(arg1, _arg2) { root.callSubscribe(arg1) }
-            }
+            // The two groups sit in a SplitView, so the boundary between them
+            // is draggable — useful when one side's fields need more room
+            // (e.g. channelCreate's three arguments).
+            SplitView {
+                id: apiSplit
 
-            MethodCall {
-                methodName: "unsubscribe"
-                arg1Name: "contentTopic"
-                callEnabled: root.nodeReady
-                infoTip: "<b>delivery_module.unsubscribe(contentTopic)</b><br><br>"
-                       + "Stop listening on the given topic. Returns a <code>LogosResult</code>."
-                onCall: function(arg1, _arg2) { root.callUnsubscribe(arg1) }
-            }
+                Layout.fillWidth: true
+                Layout.preferredHeight: Math.max(messagingGroup.implicitHeight,
+                                                 channelsGroup.implicitHeight)
+                orientation: Qt.Horizontal
 
-            MethodCall {
-                methodName: "send"
-                arg1Name: "contentTopic"
-                arg2Name: "payload (hex)"
-                callEnabled: root.nodeReady
-                infoTip: "<b>delivery_module.send(contentTopic, payload)</b><br><br>"
-                       + "Publish a message. The payload is raw <b>bytes</b>, not text — "
-                       + "enter it as hex, e.g. <code>48 65 6c 6c 6f</code> or <code>48656c6c6f</code>.<br><br>"
-                       + "On success the <code>LogosResult.getString()</code> value is the <b>request id</b>; "
-                       + "the <code>messageSent</code> and <code>messagePropagated</code> events arrive "
-                       + "asynchronously and carry the same request id."
-                onCall: function(arg1, arg2) { root.callSend(arg1, arg2) }
-            }
+                // Subtle themed handle: a hairline that widens the hit area to
+                // spacing.small and highlights while hovered/dragged. The
+                // SplitHandle attached properties live on the delegate root,
+                // so the inner line must reach them through handleRoot's id.
+                handle: Rectangle {
+                    id: handleRoot
+                    implicitWidth: Theme.spacing.small
+                    implicitHeight: Theme.spacing.small
+                    color: "transparent"
+                    Rectangle {
+                        anchors.centerIn: parent
+                        width: handleRoot.SplitHandle.pressed || handleRoot.SplitHandle.hovered ? 3 : 1
+                        height: parent.height
+                        radius: 1
+                        color: handleRoot.SplitHandle.pressed ? Theme.palette.primary
+                             : handleRoot.SplitHandle.hovered ? Theme.palette.border
+                             :                                  Theme.palette.borderHairline
+                    }
+                }
 
-            MethodCall {
-                methodName: "channelCreate"
-                arg1Name: "channelId"
-                arg2Name: "contentTopic"
-                arg3Name: "senderId"
-                callEnabled: root.nodeReady
-                infoTip: "<b>delivery_module.channelCreate(channelId, contentTopic, senderId)</b><br><br>"
-                       + "Create (or re-open) a <b>reliable channel</b> on a content topic.<br>"
-                       + "<b>channelId</b> — application-chosen channel identifier; both peers "
-                       + "must use the same id.<br>"
-                       + "<b>contentTopic</b> — the content topic the channel communicates on.<br>"
-                       + "<b>senderId</b> — this participant's SDS (Scalable Data Sync) sender "
-                       + "identifier; any string unique per participant (e.g. your peer id).<br><br>"
-                       + "Persisted channel state survives <code>channelClose()</code>, so "
-                       + "re-creating a channel with the same id restores it."
-                onCall: function(arg1, arg2, arg3) { root.callChannelCreate(arg1, arg2, arg3) }
-            }
+                ApiGroup {
+                    id: messagingGroup
+                    title: "Messaging"
+                    SplitView.preferredWidth: apiSplit.width / 2
+                    SplitView.minimumWidth: 280
 
-            MethodCall {
-                methodName: "channelExists"
-                arg1Name: "channelId"
-                callEnabled: root.nodeReady
-                infoTip: "<b>delivery_module.channelExists(channelId)</b><br><br>"
-                       + "Check whether a reliable channel is currently open. An unknown "
-                       + "channel id is not an error.<br><br>"
-                       + "Returns <code>\"true\"</code> or <code>\"false\"</code> (the verbatim "
-                       + "FFI string), logged as the <code>result</code> field."
-                onCall: function(arg1, _arg2) { root.callChannelExists(arg1) }
-            }
+                    MethodCall {
+                        methodName: "subscribe"
+                        arg1Name: "contentTopic"
+                        callEnabled: root.nodeReady
+                        infoTip: "<b>delivery_module.subscribe(contentTopic)</b><br><br>"
+                               + "Tell the node to listen for messages on a libp2p pubsub topic.<br>"
+                               + "Returns a <code>LogosResult</code>; on success the node will start emitting "
+                               + "<code>messageReceived</code> events for that topic."
+                        onCall: function(arg1, _arg2) { root.callSubscribe(arg1) }
+                    }
 
-            MethodCall {
-                methodName: "channelSend"
-                arg1Name: "channelId"
-                arg2Name: "payload (hex)"
-                callEnabled: root.nodeReady
-                infoTip: "<b>delivery_module.channelSend(channelId, payload)</b><br><br>"
-                       + "Send a message on a reliable channel. The payload is raw <b>bytes</b> — "
-                       + "enter it as hex, e.g. <code>48 65 6c 6c 6f</code> or <code>48656c6c6f</code>.<br><br>"
-                       + "On success the <code>LogosResult.getString()</code> value is the <b>request id</b>; "
-                       + "<code>channelMessageSent</code> arrives once every segment of the send is "
-                       + "confirmed, or <code>channelMessageError</code> if the send finalises with "
-                       + "a failed segment — both carry the same request id."
-                onCall: function(arg1, arg2) { root.callChannelSend(arg1, arg2) }
-            }
+                    MethodCall {
+                        methodName: "unsubscribe"
+                        arg1Name: "contentTopic"
+                        callEnabled: root.nodeReady
+                        infoTip: "<b>delivery_module.unsubscribe(contentTopic)</b><br><br>"
+                               + "Stop listening on the given topic. Returns a <code>LogosResult</code>."
+                        onCall: function(arg1, _arg2) { root.callUnsubscribe(arg1) }
+                    }
 
-            MethodCall {
-                methodName: "channelClose"
-                arg1Name: "channelId"
-                callEnabled: root.nodeReady
-                infoTip: "<b>delivery_module.channelClose(channelId)</b><br><br>"
-                       + "Close a reliable channel: stops its SDS loops. Persisted state "
-                       + "survives, so <code>channelCreate()</code> with the same id restores "
-                       + "the channel."
-                onCall: function(arg1, _arg2) { root.callChannelClose(arg1) }
+                    MethodCall {
+                        methodName: "send"
+                        arg1Name: "contentTopic"
+                        arg2Name: "payload (text)"
+                        callEnabled: root.nodeReady
+                        infoTip: "<b>delivery_module.send(contentTopic, payload)</b><br><br>"
+                               + "Publish a message. Enter the payload as plain text — it is "
+                               + "UTF-8-encoded to bytes, and the module base64-encodes those "
+                               + "bytes into the FFI envelope for you.<br><br>"
+                               + "On success the <code>LogosResult.getString()</code> value is the <b>request id</b>; "
+                               + "the <code>messageSent</code> and <code>messagePropagated</code> events arrive "
+                               + "asynchronously and carry the same request id."
+                        onCall: function(arg1, arg2) { root.callSend(arg1, arg2) }
+                    }
+                }
+
+                ApiGroup {
+                    id: channelsGroup
+                    title: "Channels"
+                    SplitView.fillWidth: true
+                    SplitView.minimumWidth: 320
+
+                    MethodCall {
+                        methodName: "channelCreate"
+                        arg1Name: "channelId"
+                        arg2Name: "contentTopic"
+                        arg3Name: "senderId"
+                        callEnabled: root.nodeReady
+                        infoTip: "<b>delivery_module.channelCreate(channelId, contentTopic, senderId)</b><br><br>"
+                               + "Create (or re-open) a <b>reliable channel</b> on a content topic.<br>"
+                               + "<b>channelId</b> — application-chosen channel identifier; both peers "
+                               + "must use the same id.<br>"
+                               + "<b>contentTopic</b> — the content topic the channel communicates on.<br>"
+                               + "<b>senderId</b> — this participant's SDS (Scalable Data Sync) sender "
+                               + "identifier; any string unique per participant (e.g. your peer id).<br><br>"
+                               + "Persisted channel state survives <code>channelClose()</code>, so "
+                               + "re-creating a channel with the same id restores it."
+                        onCall: function(arg1, arg2, arg3) { root.callChannelCreate(arg1, arg2, arg3) }
+                    }
+
+                    MethodCall {
+                        methodName: "channelExists"
+                        arg1Name: "channelId"
+                        callEnabled: root.nodeReady
+                        infoTip: "<b>delivery_module.channelExists(channelId)</b><br><br>"
+                               + "Check whether a reliable channel is currently open. An unknown "
+                               + "channel id is not an error.<br><br>"
+                               + "Returns <code>\"true\"</code> or <code>\"false\"</code> (the verbatim "
+                               + "FFI string), logged as the <code>result</code> field."
+                        onCall: function(arg1, _arg2) { root.callChannelExists(arg1) }
+                    }
+
+                    MethodCall {
+                        methodName: "channelSend"
+                        arg1Name: "channelId"
+                        arg2Name: "payload (text)"
+                        callEnabled: root.nodeReady
+                        infoTip: "<b>delivery_module.channelSend(channelId, payload)</b><br><br>"
+                               + "Send a message on a reliable channel. Enter the payload as plain "
+                               + "text — it is UTF-8-encoded to bytes, and the module base64-encodes "
+                               + "those bytes into the FFI envelope for you.<br><br>"
+                               + "On success the <code>LogosResult.getString()</code> value is the <b>request id</b>; "
+                               + "<code>channelMessageSent</code> arrives once every segment of the send is "
+                               + "confirmed, or <code>channelMessageError</code> if the send finalises with "
+                               + "a failed segment — both carry the same request id."
+                        onCall: function(arg1, arg2) { root.callChannelSend(arg1, arg2) }
+                    }
+
+                    MethodCall {
+                        methodName: "channelClose"
+                        arg1Name: "channelId"
+                        callEnabled: root.nodeReady
+                        infoTip: "<b>delivery_module.channelClose(channelId)</b><br><br>"
+                               + "Close a reliable channel: stops its SDS loops. Persisted state "
+                               + "survives, so <code>channelCreate()</code> with the same id restores "
+                               + "the channel."
+                        onCall: function(arg1, _arg2) { root.callChannelClose(arg1) }
+                    }
+                }
             }
         }
     }
 
     // ── Reusable inline components ────────────────────────────────────────────
+
+    // Keyboard-navigation shims over the design-system controls. LogosTextField
+    // wraps a raw TextInput in a Control and LogosButton is a Control plus a
+    // MouseArea — neither opts into the Tab chain (Control defaults to
+    // Qt.NoFocus, bare TextInput to activeFocusOnTab: false), and LogosButton
+    // has no keyboard activation at all. Until that is fixed upstream in
+    // logos-design-system, every field and button in this demo goes through
+    // these wrappers. LogosComboBox needs no shim: it extends the real ComboBox
+    // template, which is tab-focusable and keyboard-operable by default.
+
+    component DemoTextField: LogosTextField {
+        focusPolicy: Qt.StrongFocus
+        // Tab lands on the wrapper Control, not the text: forward the focus to
+        // the inner TextInput whenever the wrapper gains it. (Verified via an
+        // offscreen qmltestrunner harness: pre-seeding scope focus with
+        // "textInput.focus = true" at completion does NOT survive to Tab time —
+        // the wrapper ends up holding active focus and typing goes nowhere.)
+        onActiveFocusChanged: if (activeFocus) textInput.forceActiveFocus()
+    }
+
+    component DemoButton: LogosButton {
+        id: btn
+
+        focusPolicy: Qt.StrongFocus
+        Keys.onReturnPressed: btn.clicked()
+        Keys.onEnterPressed: btn.clicked()
+        Keys.onSpacePressed: btn.clicked()
+
+        // LogosButton only highlights on hover/press, so keyboard focus would
+        // otherwise be invisible. visualFocus is true only for focus gained
+        // via the keyboard — no ring appears on mouse interaction.
+        Rectangle {
+            anchors.fill: parent
+            radius: btn.radius
+            color: "transparent"
+            border.width: 1
+            border.color: Theme.palette.overlayOrange
+            visible: btn.visualFocus
+        }
+    }
 
     component InfoChip: Rectangle {
         property string tip: ""
@@ -607,6 +699,46 @@ Item {
         }
     }
 
+    // ── API-call group panel ──────────────────────────────────────────────────
+    // Titled panel grouping related method-call cards (Messaging / Channels).
+    // Children declared inside an ApiGroup land in the inner column below the
+    // title. Groups live in the SplitView, which sizes them via the attached
+    // SplitView.* properties and stretches both to the split's height — the
+    // trailing filler keeps a shorter group's cards packed to the top.
+    component ApiGroup: Rectangle {
+        id: grp
+
+        property string title: ""
+        default property alias content: groupCol.data
+
+        implicitHeight: grpCol.implicitHeight + Theme.spacing.medium * 2
+        color: Theme.palette.backgroundSecondary
+        radius: Theme.spacing.radiusMedium
+        border.width: 1
+        border.color: Theme.palette.borderHairline
+
+        ColumnLayout {
+            id: grpCol
+            anchors.fill: parent
+            anchors.margins: Theme.spacing.medium
+            spacing: Theme.spacing.small
+
+            LogosText {
+                text: grp.title
+                font.pixelSize: Theme.typography.subtitleText
+                font.weight: Theme.typography.weightBold
+            }
+
+            ColumnLayout {
+                id: groupCol
+                Layout.fillWidth: true
+                spacing: Theme.spacing.small
+            }
+
+            Item { Layout.fillHeight: true }
+        }
+    }
+
     // ── Method-call playground row ────────────────────────────────────────────
     // Renders as:
     //   methodName ( [arg1____], [arg2____], [arg3____] ) [Call] [?]
@@ -628,7 +760,10 @@ Item {
 
         Layout.fillWidth: true
         Layout.preferredHeight: row.implicitHeight + Theme.spacing.medium * 2
-        color: Theme.palette.backgroundSecondary
+        // Cards nest inside an ApiGroup panel (backgroundSecondary), so they
+        // use backgroundElevated to stand out — same convention as the event
+        // log rows inside their panel.
+        color: Theme.palette.backgroundElevated
         radius: Theme.spacing.radiusMedium
         border.width: 1
         border.color: Theme.palette.borderHairline
@@ -659,7 +794,7 @@ Item {
                 font.pixelSize: Theme.typography.primaryText
                 color: Theme.palette.textSecondary
             }
-            LogosTextField {
+            DemoTextField {
                 id: arg1Field
                 placeholderText: mc.arg1Name
                 Layout.fillWidth: true
@@ -676,7 +811,7 @@ Item {
                 font.pixelSize: Theme.typography.primaryText
                 color: Theme.palette.textSecondary
             }
-            LogosTextField {
+            DemoTextField {
                 id: arg2Field
                 visible: mc.hasArg2
                 placeholderText: mc.arg2Name
@@ -695,7 +830,7 @@ Item {
                 font.pixelSize: Theme.typography.primaryText
                 color: Theme.palette.textSecondary
             }
-            LogosTextField {
+            DemoTextField {
                 id: arg3Field
                 visible: mc.hasArg3
                 placeholderText: mc.arg3Name
@@ -713,7 +848,7 @@ Item {
                 font.pixelSize: Theme.typography.primaryText
                 color: Theme.palette.textSecondary
             }
-            LogosButton {
+            DemoButton {
                 text: "Call"
                 Layout.preferredWidth: 72
                 Layout.preferredHeight: 40
@@ -796,7 +931,7 @@ Item {
                 font.pixelSize: Theme.typography.primaryText
                 color: Theme.palette.textSecondary
             }
-            LogosButton {
+            DemoButton {
                 text: "Call"
                 Layout.preferredWidth: 72
                 Layout.preferredHeight: 40
@@ -891,7 +1026,12 @@ Item {
             FieldRow { name: "channelId"; value: evt ? evt.channelId || "" : ""; mono: true }
             FieldRow { name: "senderId";  value: evt ? evt.senderId  || "" : ""; mono: true }
             FieldRow { name: "topic";     value: evt ? evt.topic     || "" : ""; mono: true }
-            FieldRow { name: "payload (hex)"; value: evt ? evt.payload || "" : ""; mono: true; multiline: true }
+            // Sent payloads are logged as the text that was typed; received
+            // payloads arrive as arbitrary bytes and are shown as hex, plus a
+            // decoded-text row when the bytes are valid UTF-8 (the backend
+            // sends "" otherwise, which self-hides the row).
+            FieldRow { name: "payload";   value: evt ? evt.payload   || "" : ""; mono: true; multiline: true }
+            FieldRow { name: "payload (text)"; value: evt ? evt.payloadText || "" : ""; multiline: true }
             FieldRow { name: "hash";      value: evt ? evt.hash      || "" : ""; mono: true }
             FieldRow { name: "requestId"; value: evt ? evt.requestId || "" : ""; mono: true }
             FieldRow { name: "result";    value: evt ? evt.result    || "" : ""; mono: true }
