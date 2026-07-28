@@ -69,7 +69,20 @@ The node is **not** started automatically. Use the `createNode` row in the metho
 
 ### Running multiple instances on one machine
 
-Run `nix run` twice in separate terminals — subscribe both to the same content topic, send from one, and the other will fire `messageReceived`. The demo specifies no ports, so `logos-delivery-module` defaults them to `0` and the OS assigns free ports per instance — the underlying waku listeners (TCP, discv5, …) don't collide.
+Give each instance its own session directory with `--user-dir`:
+
+```bash
+# terminal A
+nix run . -- --user-dir ~/.local/share/delivery_demo_a
+# terminal B
+nix run . -- --user-dir ~/.local/share/delivery_demo_b
+```
+
+Then subscribe both to the same content topic and send from one — the other fires `messageReceived`. For channels, run `channelCreate` on both with the *same* `channelId`, then `channelSend` from one and watch `channelMessageReceived` on the other.
+
+The demo specifies no ports, so `logos-delivery-module` defaults them to `0` and the OS assigns free ports per instance — the underlying waku listeners (TCP, discv5, …) don't collide.
+
+`--user-dir` is what keeps the two nodes' **storage** apart: the standalone app hands every module its own directory under `<session dir>/module_data`, and the delivery module points the node's storage there ([logos-delivery-module#72](https://github.com/logos-co/logos-delivery-module/pull/72) — until that lands in the pinned module rev, both instances fall back to a working-directory-relative `./data` and share one SDS database). Without `--user-dir` every instance shares the default application data location, so pass it even once #72 is in.
 
 ## References
 
