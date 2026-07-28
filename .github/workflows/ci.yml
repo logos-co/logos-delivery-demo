@@ -31,9 +31,9 @@ jobs:
         os: [ubuntu-latest, macos-latest]
 
     runs-on: ${{ matrix.os }}
-    # Generous: until the pinned delivery_module release is in the cache, the
-    # whole Nim/Rust delivery chain is built from source on the first run.
-    timeout-minutes: 90
+    # A warm cache builds this in ~2 min; the headroom is for a cache miss on
+    # the pinned delivery_module, which pulls in the Nim/Rust delivery chain.
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
