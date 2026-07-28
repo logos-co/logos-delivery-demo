@@ -418,10 +418,17 @@ Item {
                     DemoButton {
                         text: "Clear"
                         enabled: root.events.length > 0
-                        Layout.preferredWidth: 56
-                        Layout.preferredHeight: 28
-                        implicitWidth: 56
+                        // LogosButton's default padding is spacing.large a side
+                        // and its implicitWidth floors at 100; a fixed width
+                        // narrower than that elides the label. Tighten the
+                        // padding and size to the text instead, so the label
+                        // always fits.
+                        leftPadding: Theme.spacing.small
+                        rightPadding: Theme.spacing.small
+                        implicitWidth: implicitContentWidth + leftPadding + rightPadding
                         implicitHeight: 28
+                        Layout.preferredWidth: implicitWidth
+                        Layout.preferredHeight: 28
                         onClicked: root.events = []
                     }
                 }
@@ -471,10 +478,12 @@ Item {
                                                  channelsGroup.implicitHeight)
                 orientation: Qt.Horizontal
 
-                // Subtle themed handle: a hairline that widens the hit area to
-                // spacing.small and highlights while hovered/dragged. The
-                // SplitHandle attached properties live on the delegate root,
-                // so the inner line must reach them through handleRoot's id.
+                // The handle draws nothing at rest — the two panels' own borders
+                // already separate them. It only becomes visible while hovered
+                // or dragged, so the split stays discoverable without adding a
+                // permanent line between the groups. The SplitHandle attached
+                // properties live on the delegate root, so the inner line must
+                // reach them through handleRoot's id.
                 handle: Rectangle {
                     id: handleRoot
                     implicitWidth: Theme.spacing.small
@@ -482,12 +491,12 @@ Item {
                     color: "transparent"
                     Rectangle {
                         anchors.centerIn: parent
-                        width: handleRoot.SplitHandle.pressed || handleRoot.SplitHandle.hovered ? 3 : 1
+                        visible: handleRoot.SplitHandle.pressed || handleRoot.SplitHandle.hovered
+                        width: handleRoot.SplitHandle.pressed ? 3 : 1
                         height: parent.height
                         radius: 1
                         color: handleRoot.SplitHandle.pressed ? Theme.palette.primary
-                             : handleRoot.SplitHandle.hovered ? Theme.palette.border
-                             :                                  Theme.palette.borderHairline
+                             :                                  Theme.palette.border
                     }
                 }
 
@@ -760,10 +769,9 @@ Item {
 
         Layout.fillWidth: true
         Layout.preferredHeight: row.implicitHeight + Theme.spacing.medium * 2
-        // Cards nest inside an ApiGroup panel (backgroundSecondary), so they
-        // use backgroundElevated to stand out — same convention as the event
-        // log rows inside their panel.
-        color: Theme.palette.backgroundElevated
+        // Same fill as the enclosing ApiGroup (and as CreateNodeCall), so a
+        // card reads as an outlined row rather than a darker inset block.
+        color: Theme.palette.backgroundSecondary
         radius: Theme.spacing.radiusMedium
         border.width: 1
         border.color: Theme.palette.borderHairline
