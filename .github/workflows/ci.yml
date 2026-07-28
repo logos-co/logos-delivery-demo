@@ -1,0 +1,52 @@
+name: CI
+
+# Builds the demo module from the flake on both supported platforms:
+# `.#default` is the plugin, `.#lgx` the installable package. Nix inputs and
+# build outputs come from / go to the Logos Attic cache — pushes to main
+# publish to the `public` cache, every other ref to `ci` (fork PRs get no
+# secrets and simply skip publishing; reading needs no credentials).
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: nix build (${{ matrix.os }})
+    # ATTIC_TOKEN_PUBLIC only exists in the public-cache environment.
+    environment: ${{ github.ref == 'refs/heads/main' && 'public-cache' || '' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    runs-on: ${{ matrix.os }}
+    # Generous: until the pinned delivery_module release is in the cache, the
+    # whole Nim/Rust delivery chain is built from source on the first run.
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Nix and Logos cache
+        uses: logos-co/setup-nix-cache-action@v1
+        with:
+          attic-token-ci: ${{ secrets.ATTIC_TOKEN_CI }}
+          attic-token-public: ${{ secrets.ATTIC_TOKEN_PUBLIC }}
+
+      - name: Build the module
+        run: nix build -L
+
+      - name: Package as .lgx
+        run: nix build .#lgx -L

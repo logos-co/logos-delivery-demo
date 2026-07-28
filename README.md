@@ -1,5 +1,7 @@
 # logos-delivery-demo
 
+[![CI](https://github.com/logos-co/logos-delivery-demo/actions/workflows/ci.yml/badge.svg)](https://github.com/logos-co/logos-delivery-demo/actions/workflows/ci.yml)
+
 A small `ui_qml` module that demonstrates **how an application uses [`logos-delivery-module`](https://github.com/logos-co/logos-delivery-module)** to send and receive messages on the Logos messaging network.
 
 This repo is the runnable companion to the journey doc [**Use the Logos Delivery module API from an app**](https://github.com/logos-co/logos-docs/blob/main/docs/messaging/journeys/use-the-logos-delivery-module-api-from-an-app.md) — every code path in the doc is exercised here, and every interactive control has an info button explaining which `delivery_module` API call it triggers.
