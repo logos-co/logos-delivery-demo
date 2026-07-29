@@ -8,20 +8,6 @@
 #include <QJsonObject>
 #include <QTimer>
 
-namespace {
-// Best-effort UTF-8 decode of a received payload for display. Returns the
-// decoded text, or an empty string when the bytes are not valid UTF-8 (the
-// round-trip check catches the U+FFFD replacement characters fromUtf8
-// substitutes for invalid sequences). Payloads are arbitrary bytes, so the
-// hex rendering stays authoritative — this only feeds the "payload (text)"
-// convenience row in the event log.
-QString decodePayloadText(const QByteArray& payload)
-{
-    const QString text = QString::fromUtf8(payload);
-    return text.toUtf8() == payload ? text : QString();
-}
-} // namespace
-
 LogosDeliveryDemoPlugin::LogosDeliveryDemoPlugin(QObject* parent)
     : LogosDeliveryDemoSimpleSource(parent)
 {
@@ -68,7 +54,6 @@ void LogosDeliveryDemoPlugin::wireEvents()
         emit messageReceived(
             data.at(1).toString(),                       // contentTopic
             QString::fromLatin1(payload.toHex(' ')),     // payload (hex bytes)
-            decodePayloadText(payload),                  // payload as UTF-8 text ("" if not text)
             data.at(0).toString(),                       // messageHash
             data.at(3).toLongLong());                    // timestamp (qint64, ns since epoch)
     });
@@ -97,7 +82,6 @@ void LogosDeliveryDemoPlugin::wireEvents()
             data.at(0).toString(),                       // channelId
             data.at(1).toString(),                       // senderId
             QString::fromLatin1(payload.toHex(' ')),     // payload (hex bytes)
-            decodePayloadText(payload),                  // payload as UTF-8 text ("" if not text)
             data.at(3).toLongLong());                    // timestamp (qint64, ns since epoch)
     });
 
@@ -200,14 +184,14 @@ QString LogosDeliveryDemoPlugin::unsubscribe(QString topic)
     return QString();
 }
 
-QString LogosDeliveryDemoPlugin::sendMessage(QString topic, QString payloadText)
+QString LogosDeliveryDemoPlugin::sendMessage(QString topic, QString payloadHex)
 {
     if (!m_logos) return QStringLiteral("Backend not initialised");
-    // The UI provides the payload as plain text; encode it to UTF-8 bytes and
-    // pass them through as a QByteArray. delivery_module itself base64-encodes
-    // the bytes into the FFI envelope ({"payload": base64, ...}) — encoding
-    // here as well would double-encode.
-    const QByteArray payload = payloadText.toUtf8();
+    // The payload is arbitrary bytes; the UI provides them as a hex string.
+    // send()'s payload arg is a QVariant carrying a QByteArray — pass the raw
+    // bytes so they cross unchanged (a QString would be re-encoded as UTF-8).
+    // delivery_module base64-encodes them into the FFI envelope from there.
+    const QByteArray payload = QByteArray::fromHex(payloadHex.toLatin1());
     LogosResult r = m_logos->delivery_module.send(topic, payload);
     if (!r.success) {
         setLastError(QStringLiteral("send(%1) failed: %2").arg(topic, r.getError()));
@@ -238,12 +222,12 @@ QString LogosDeliveryDemoPlugin::channelExists(QString channelId)
     return r.getString();  // "true" / "false", verbatim from the FFI
 }
 
-QString LogosDeliveryDemoPlugin::channelSend(QString channelId, QString payloadText)
+QString LogosDeliveryDemoPlugin::channelSend(QString channelId, QString payloadHex)
 {
     if (!m_logos) return QStringLiteral("Backend not initialised");
-    // Same convention as sendMessage(): plain text in, UTF-8 bytes to the
-    // module, which base64-encodes them into the FFI envelope.
-    const QByteArray payload = payloadText.toUtf8();
+    // Same convention as sendMessage(): hex in, raw bytes to the module,
+    // which base64-encodes them into the FFI envelope.
+    const QByteArray payload = QByteArray::fromHex(payloadHex.toLatin1());
     LogosResult r = m_logos->delivery_module.channelSend(channelId, payload);
     if (!r.success) {
         setLastError(QStringLiteral("channelSend(%1) failed: %2").arg(channelId, r.getError()));

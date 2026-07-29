@@ -30,13 +30,12 @@ Item {
         target: backend
         ignoreUnknownSignals: true
 
-        function onMessageReceived(topic, payload, payloadText, messageHash, timestamp) {
+        function onMessageReceived(topic, payload, messageHash, timestamp) {
             root.logEvent({
                 eventName: "messageReceived",
                 direction: "in",
                 topic: topic,
                 payload: payload,
-                payloadText: payloadText,
                 hash: messageHash,
                 ts: timestamp
             })
@@ -69,14 +68,13 @@ Item {
                 ts: timestamp
             })
         }
-        function onChannelMessageReceived(channelId, senderId, payload, payloadText, timestamp) {
+        function onChannelMessageReceived(channelId, senderId, payload, timestamp) {
             root.logEvent({
                 eventName: "channelMessageReceived",
                 direction: "in",
                 channelId: channelId,
                 senderId: senderId,
                 payload: payload,
-                payloadText: payloadText,
                 ts: timestamp
             })
         }
@@ -529,12 +527,12 @@ Item {
                     MethodCall {
                         methodName: "send"
                         arg1Name: "contentTopic"
-                        arg2Name: "payload (text)"
+                        arg2Name: "payload (hex)"
                         callEnabled: root.nodeReady
                         infoTip: "<b>delivery_module.send(contentTopic, payload)</b><br><br>"
-                               + "Publish a message. Enter the payload as plain text — it is "
-                               + "UTF-8-encoded to bytes, and the module base64-encodes those "
-                               + "bytes into the FFI envelope for you.<br><br>"
+                               + "Publish a message. The payload is raw <b>bytes</b>, not text — "
+                               + "enter it as hex, e.g. <code>48 65 6c 6c 6f</code> or "
+                               + "<code>48656c6c6f</code>.<br><br>"
                                + "On success the <code>LogosResult.getString()</code> value is the <b>request id</b>; "
                                + "the <code>messageSent</code> and <code>messagePropagated</code> events arrive "
                                + "asynchronously and carry the same request id."
@@ -581,12 +579,12 @@ Item {
                     MethodCall {
                         methodName: "channelSend"
                         arg1Name: "channelId"
-                        arg2Name: "payload (text)"
+                        arg2Name: "payload (hex)"
                         callEnabled: root.nodeReady
                         infoTip: "<b>delivery_module.channelSend(channelId, payload)</b><br><br>"
-                               + "Send a message on a reliable channel. Enter the payload as plain "
-                               + "text — it is UTF-8-encoded to bytes, and the module base64-encodes "
-                               + "those bytes into the FFI envelope for you.<br><br>"
+                               + "Send a message on a reliable channel. The payload is raw "
+                               + "<b>bytes</b>, not text — enter it as hex, e.g. "
+                               + "<code>48 65 6c 6c 6f</code> or <code>48656c6c6f</code>.<br><br>"
                                + "On success the <code>LogosResult.getString()</code> value is the <b>request id</b>; "
                                + "<code>channelMessageSent</code> arrives once every segment of the send is "
                                + "confirmed, or <code>channelMessageError</code> if the send finalises with "
@@ -1034,14 +1032,10 @@ Item {
             FieldRow { name: "channelId"; value: evt ? evt.channelId || "" : ""; mono: true }
             FieldRow { name: "senderId";  value: evt ? evt.senderId  || "" : ""; mono: true }
             FieldRow { name: "topic";     value: evt ? evt.topic     || "" : ""; mono: true }
-            // Sent payloads are logged as the text that was typed; received
-            // payloads arrive as arbitrary bytes and are shown as hex, plus a
-            // decoded-text row when the bytes are valid UTF-8 (the backend
-            // sends "" otherwise, which self-hides the row).
+            // Payloads are arbitrary bytes, shown as hex in both directions.
             // 480 chars of space-separated hex ≈ 160 payload bytes — about two
             // wrapped lines before the ellipsis kicks in.
             FieldRow { name: "payload";   value: evt ? evt.payload   || "" : ""; mono: true; multiline: true; truncateAt: 480 }
-            FieldRow { name: "payload (text)"; value: evt ? evt.payloadText || "" : ""; multiline: true; truncateAt: 480 }
             FieldRow { name: "hash";      value: evt ? evt.hash      || "" : ""; mono: true }
             FieldRow { name: "requestId"; value: evt ? evt.requestId || "" : ""; mono: true }
             FieldRow { name: "result";    value: evt ? evt.result    || "" : ""; mono: true }

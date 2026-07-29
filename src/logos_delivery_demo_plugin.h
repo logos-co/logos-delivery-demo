@@ -31,10 +31,10 @@ public:
     QString createNode(QString preset, QString mode) override;
     QString subscribe(QString topic) override;
     QString unsubscribe(QString topic) override;
-    QString sendMessage(QString topic, QString payloadText) override;
+    QString sendMessage(QString topic, QString payloadHex) override;
     QString channelCreate(QString channelId, QString contentTopic, QString senderId) override;
     QString channelExists(QString channelId) override;
-    QString channelSend(QString channelId, QString payloadText) override;
+    QString channelSend(QString channelId, QString payloadHex) override;
     QString channelClose(QString channelId) override;
 
 signals:
