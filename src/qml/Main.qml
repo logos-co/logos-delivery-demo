@@ -712,6 +712,9 @@ Item {
 
             RowLayout {
                 Layout.fillWidth: true
+                // On top of the column's spacing, so the title sits apart from
+                // the cards rather than looking like the first of them.
+                Layout.bottomMargin: Theme.spacing.small
                 spacing: Theme.spacing.small
 
                 LogosText {
