@@ -75,8 +75,6 @@ void LogosDeliveryDemoPlugin::wireEvents()
 
     m_logos->delivery_module.on("channelMessageReceived", [this](const QVariantList& data) {
         if (data.size() < 4) return;
-        // data[2] is the message payload — arbitrary bytes, surfaced as hex,
-        // same as messageReceived above.
         const QByteArray payload = data.at(2).toByteArray();
         emit channelMessageReceived(
             data.at(0).toString(),                       // channelId
@@ -190,7 +188,6 @@ QString LogosDeliveryDemoPlugin::sendMessage(QString topic, QString payloadHex)
     // The payload is arbitrary bytes; the UI provides them as a hex string.
     // send()'s payload arg is a QVariant carrying a QByteArray — pass the raw
     // bytes so they cross unchanged (a QString would be re-encoded as UTF-8).
-    // delivery_module base64-encodes them into the FFI envelope from there.
     const QByteArray payload = QByteArray::fromHex(payloadHex.toLatin1());
     LogosResult r = m_logos->delivery_module.send(topic, payload);
     if (!r.success) {
@@ -225,8 +222,7 @@ QString LogosDeliveryDemoPlugin::channelExists(QString channelId)
 QString LogosDeliveryDemoPlugin::channelSend(QString channelId, QString payloadHex)
 {
     if (!m_logos) return QStringLiteral("Backend not initialised");
-    // Same convention as sendMessage(): hex in, raw bytes to the module,
-    // which base64-encodes them into the FFI envelope.
+    // Same convention as sendMessage().
     const QByteArray payload = QByteArray::fromHex(payloadHex.toLatin1());
     LogosResult r = m_logos->delivery_module.channelSend(channelId, payload);
     if (!r.success) {

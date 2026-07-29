@@ -416,11 +416,8 @@ Item {
                     DemoButton {
                         text: "Clear"
                         enabled: root.events.length > 0
-                        // LogosButton's default padding is spacing.large a side
-                        // and its implicitWidth floors at 100; a fixed width
-                        // narrower than that elides the label. Tighten the
-                        // padding and size to the text instead, so the label
-                        // always fits.
+                        // LogosButton floors implicitWidth at 100 and pads
+                        // spacing.large a side, which elides a short label.
                         leftPadding: Theme.spacing.small
                         rightPadding: Theme.spacing.small
                         implicitWidth: implicitContentWidth + leftPadding + rightPadding
@@ -444,8 +441,6 @@ Item {
         }
 
         // ─── Method-call playground ──────────────────────────────────────────
-        // createNode spans the full width on top; below it the per-domain API
-        // calls sit in two side-by-side groups: Messaging and Reliable Channels.
         ColumnLayout {
             Layout.fillWidth: true
             spacing: Theme.spacing.small
@@ -465,9 +460,6 @@ Item {
                 onCall: function(preset, mode) { root.callCreateNode(preset, mode) }
             }
 
-            // The two groups sit in a SplitView, so the boundary between them
-            // is draggable — useful when one side's fields need more room
-            // (e.g. channelCreate's three arguments).
             SplitView {
                 id: apiSplit
 
@@ -476,12 +468,8 @@ Item {
                                                  channelsGroup.implicitHeight)
                 orientation: Qt.Horizontal
 
-                // The handle draws nothing at rest — the two panels' own borders
-                // already separate them. It only becomes visible while hovered
-                // or dragged, so the split stays discoverable without adding a
-                // permanent line between the groups. The SplitHandle attached
-                // properties live on the delegate root, so the inner line must
-                // reach them through handleRoot's id.
+                // SplitHandle attached properties live on the delegate root,
+                // so the inner line reaches them through handleRoot's id.
                 handle: Rectangle {
                     id: handleRoot
                     implicitWidth: Theme.spacing.small
@@ -611,22 +599,15 @@ Item {
 
     // ── Reusable inline components ────────────────────────────────────────────
 
-    // Keyboard-navigation shims over the design-system controls. LogosTextField
-    // wraps a raw TextInput in a Control and LogosButton is a Control plus a
-    // MouseArea — neither opts into the Tab chain (Control defaults to
-    // Qt.NoFocus, bare TextInput to activeFocusOnTab: false), and LogosButton
-    // has no keyboard activation at all. Until that is fixed upstream in
-    // logos-design-system, every field and button in this demo goes through
-    // these wrappers. LogosComboBox needs no shim: it extends the real ComboBox
-    // template, which is tab-focusable and keyboard-operable by default.
+    // Keyboard-navigation shims: neither LogosTextField nor LogosButton opts
+    // into the Tab chain, and LogosButton has no keyboard activation. Drop
+    // these once logos-design-system handles it.
 
     component DemoTextField: LogosTextField {
         focusPolicy: Qt.StrongFocus
-        // Tab lands on the wrapper Control, not the text: forward the focus to
-        // the inner TextInput whenever the wrapper gains it. (Verified via an
-        // offscreen qmltestrunner harness: pre-seeding scope focus with
-        // "textInput.focus = true" at completion does NOT survive to Tab time —
-        // the wrapper ends up holding active focus and typing goes nowhere.)
+        // Tab lands on the wrapper Control, not the text: forward focus to the
+        // inner TextInput whenever the wrapper gains it. Pre-seeding scope
+        // focus at completion does not survive to Tab time.
         onActiveFocusChanged: if (activeFocus) textInput.forceActiveFocus()
     }
 
@@ -639,8 +620,7 @@ Item {
         Keys.onSpacePressed: btn.clicked()
 
         // LogosButton only highlights on hover/press, so keyboard focus would
-        // otherwise be invisible. visualFocus is true only for focus gained
-        // via the keyboard — no ring appears on mouse interaction.
+        // otherwise be invisible.
         Rectangle {
             anchors.fill: parent
             radius: btn.radius
@@ -709,18 +689,12 @@ Item {
     }
 
     // ── API-call group panel ──────────────────────────────────────────────────
-    // Titled panel grouping related method-call cards (Messaging / Reliable
-    // Channels), with an optional maturity tag beside the title.
     // Children declared inside an ApiGroup land in the inner column below the
-    // title. Groups live in the SplitView, which sizes them via the attached
-    // SplitView.* properties and stretches both to the split's height — the
-    // trailing filler keeps a shorter group's cards packed to the top.
+    // title; the trailing filler keeps a shorter group's cards packed to the top.
     component ApiGroup: Rectangle {
         id: grp
 
         property string title: ""
-        // Maturity tag rendered as a grey pill beside the title ("Beta",
-        // "Developer Preview"); empty hides it.
         property string tag: ""
         default property alias content: groupCol.data
 
@@ -800,10 +774,6 @@ Item {
 
         Layout.fillWidth: true
         Layout.preferredHeight: row.implicitHeight
-        // Unpainted and unpadded: the enclosing ApiGroup already frames and
-        // spaces these, so a card is just a row. Kept as a Rectangle rather
-        // than an Item so the component stays a drop-in for the group's other
-        // children.
         color: "transparent"
 
         function invoke() {
@@ -831,11 +801,8 @@ Item {
                 font.pixelSize: Theme.typography.primaryText
                 color: Theme.palette.textSecondary
             }
-            // No Layout.minimumWidth on the argument fields: a floor per field
-            // adds up past the group's width (channelCreate's three fields
-            // alone outgrew the Reliable Channels panel), and the row then overflowed
-            // instead of shrinking. They fill whatever is left and shrink
-            // first when the window narrows.
+            // No Layout.minimumWidth: per-field floors add up past the group's
+            // width and the row overflows instead of shrinking.
             DemoTextField {
                 id: arg1Field
                 placeholderText: mc.arg1Name
@@ -1065,9 +1032,8 @@ Item {
             FieldRow { name: "channelId"; value: evt ? evt.channelId || "" : ""; mono: true }
             FieldRow { name: "senderId";  value: evt ? evt.senderId  || "" : ""; mono: true }
             FieldRow { name: "topic";     value: evt ? evt.topic     || "" : ""; mono: true }
-            // Payloads are arbitrary bytes, shown as hex in both directions.
-            // 480 chars of space-separated hex ≈ 160 payload bytes — about two
-            // wrapped lines before the ellipsis kicks in.
+            // 480 chars of space-separated hex ≈ 160 payload bytes, about two
+            // wrapped lines.
             FieldRow { name: "payload";   value: evt ? evt.payload   || "" : ""; mono: true; multiline: true; truncateAt: 480 }
             FieldRow { name: "hash";      value: evt ? evt.hash      || "" : ""; mono: true }
             FieldRow { name: "requestId"; value: evt ? evt.requestId || "" : ""; mono: true }
@@ -1082,9 +1048,8 @@ Item {
         property bool   mono: false
         property bool   multiline: false
         property bool   isError: false
-        // Cap runaway values (multi-KiB payloads) at roughly two wrapped
-        // lines, ellipsis-style; 0 shows the full value. The cut prefers the
-        // last space before the limit so a hex byte pair is never split.
+        // 0 shows the full value. The cut prefers the last space before the
+        // limit so a hex byte pair is never split.
         property int    truncateAt: 0
 
         // Self-hide when the value is empty so events only render fields they
