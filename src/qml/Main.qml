@@ -769,12 +769,10 @@ Item {
 
         Layout.fillWidth: true
         Layout.preferredHeight: row.implicitHeight + Theme.spacing.medium * 2
-        // Same fill as the enclosing ApiGroup (and as CreateNodeCall), so a
-        // card reads as an outlined row rather than a darker inset block.
-        color: Theme.palette.backgroundSecondary
-        radius: Theme.spacing.radiusMedium
-        border.width: 1
-        border.color: Theme.palette.borderHairline
+        // Unpainted: the enclosing ApiGroup already frames these, so a card is
+        // just a row. Kept as a Rectangle rather than an Item so the component
+        // stays a drop-in for the group's other children.
+        color: "transparent"
 
         function invoke() {
             if (!mc.callEnabled) return
@@ -802,11 +800,15 @@ Item {
                 font.pixelSize: Theme.typography.primaryText
                 color: Theme.palette.textSecondary
             }
+            // No Layout.minimumWidth on the argument fields: a floor per field
+            // adds up past the group's width (channelCreate's three fields
+            // alone outgrew the Channels panel), and the row then overflowed
+            // instead of shrinking. They fill whatever is left and shrink
+            // first when the window narrows.
             DemoTextField {
                 id: arg1Field
                 placeholderText: mc.arg1Name
                 Layout.fillWidth: true
-                Layout.minimumWidth: 100
             }
             Connections {
                 target: arg1Field.textInput
@@ -824,7 +826,6 @@ Item {
                 visible: mc.hasArg2
                 placeholderText: mc.arg2Name
                 Layout.fillWidth: mc.hasArg2
-                Layout.minimumWidth: mc.hasArg2 ? 100 : 0
             }
             Connections {
                 target: arg2Field.textInput
@@ -843,7 +844,6 @@ Item {
                 visible: mc.hasArg3
                 placeholderText: mc.arg3Name
                 Layout.fillWidth: mc.hasArg3
-                Layout.minimumWidth: mc.hasArg3 ? 100 : 0
             }
             Connections {
                 target: arg3Field.textInput
