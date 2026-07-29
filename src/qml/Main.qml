@@ -545,7 +545,6 @@ Item {
                     id: channelsGroup
                     title: "Reliable Channels"
                     tag: "Developer Preview"
-                    tagColor: Theme.palette.primary
                     SplitView.fillWidth: true
                     SplitView.minimumWidth: 320
 
@@ -720,10 +719,9 @@ Item {
         id: grp
 
         property string title: ""
-        // Maturity tag rendered as a pill beside the title ("Beta",
+        // Maturity tag rendered as a grey pill beside the title ("Beta",
         // "Developer Preview"); empty hides it.
         property string tag: ""
-        property color tagColor: Theme.palette.textSecondary
         default property alias content: groupCol.data
 
         implicitHeight: grpCol.implicitHeight + Theme.spacing.medium * 2
@@ -753,15 +751,17 @@ Item {
                     Layout.preferredWidth: tagLabel.implicitWidth + Theme.spacing.small * 2
                     Layout.preferredHeight: tagLabel.implicitHeight + Theme.spacing.tiny * 2
                     radius: height / 2
-                    color: Qt.rgba(grp.tagColor.r, grp.tagColor.g, grp.tagColor.b, 0.15)
+                    color: Qt.rgba(Theme.palette.textSecondary.r,
+                                   Theme.palette.textSecondary.g,
+                                   Theme.palette.textSecondary.b, 0.15)
                     border.width: 1
-                    border.color: grp.tagColor
+                    border.color: Theme.palette.textSecondary
 
                     LogosText {
                         id: tagLabel
                         anchors.centerIn: parent
                         text: grp.tag
-                        color: grp.tagColor
+                        color: Theme.palette.textSecondary
                         font.pixelSize: Theme.typography.secondaryText
                     }
                 }
