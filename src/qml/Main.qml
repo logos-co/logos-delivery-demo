@@ -445,7 +445,7 @@ Item {
 
         // ─── Method-call playground ──────────────────────────────────────────
         // createNode spans the full width on top; below it the per-domain API
-        // calls sit in two side-by-side groups: Messaging and Channels.
+        // calls sit in two side-by-side groups: Messaging and Reliable Channels.
         ColumnLayout {
             Layout.fillWidth: true
             spacing: Theme.spacing.small
@@ -501,6 +501,7 @@ Item {
                 ApiGroup {
                     id: messagingGroup
                     title: "Messaging"
+                    tag: "Beta"
                     SplitView.preferredWidth: apiSplit.width / 2
                     SplitView.minimumWidth: 280
 
@@ -542,7 +543,9 @@ Item {
 
                 ApiGroup {
                     id: channelsGroup
-                    title: "Channels"
+                    title: "Reliable Channels"
+                    tag: "Developer Preview"
+                    tagColor: Theme.palette.primary
                     SplitView.fillWidth: true
                     SplitView.minimumWidth: 320
 
@@ -707,7 +710,8 @@ Item {
     }
 
     // ── API-call group panel ──────────────────────────────────────────────────
-    // Titled panel grouping related method-call cards (Messaging / Channels).
+    // Titled panel grouping related method-call cards (Messaging / Reliable
+    // Channels), with an optional maturity tag beside the title.
     // Children declared inside an ApiGroup land in the inner column below the
     // title. Groups live in the SplitView, which sizes them via the attached
     // SplitView.* properties and stretches both to the split's height — the
@@ -716,6 +720,10 @@ Item {
         id: grp
 
         property string title: ""
+        // Maturity tag rendered as a pill beside the title ("Beta",
+        // "Developer Preview"); empty hides it.
+        property string tag: ""
+        property color tagColor: Theme.palette.textSecondary
         default property alias content: groupCol.data
 
         implicitHeight: grpCol.implicitHeight + Theme.spacing.medium * 2
@@ -730,10 +738,35 @@ Item {
             anchors.margins: Theme.spacing.medium
             spacing: Theme.spacing.small
 
-            LogosText {
-                text: grp.title
-                font.pixelSize: Theme.typography.subtitleText
-                font.weight: Theme.typography.weightBold
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Theme.spacing.small
+
+                LogosText {
+                    text: grp.title
+                    font.pixelSize: Theme.typography.subtitleText
+                    font.weight: Theme.typography.weightBold
+                }
+
+                Rectangle {
+                    visible: grp.tag.length > 0
+                    Layout.preferredWidth: tagLabel.implicitWidth + Theme.spacing.small * 2
+                    Layout.preferredHeight: tagLabel.implicitHeight + Theme.spacing.tiny * 2
+                    radius: height / 2
+                    color: Qt.rgba(grp.tagColor.r, grp.tagColor.g, grp.tagColor.b, 0.15)
+                    border.width: 1
+                    border.color: grp.tagColor
+
+                    LogosText {
+                        id: tagLabel
+                        anchors.centerIn: parent
+                        text: grp.tag
+                        color: grp.tagColor
+                        font.pixelSize: Theme.typography.secondaryText
+                    }
+                }
+
+                Item { Layout.fillWidth: true }
             }
 
             ColumnLayout {
@@ -800,7 +833,7 @@ Item {
             }
             // No Layout.minimumWidth on the argument fields: a floor per field
             // adds up past the group's width (channelCreate's three fields
-            // alone outgrew the Channels panel), and the row then overflowed
+            // alone outgrew the Reliable Channels panel), and the row then overflowed
             // instead of shrinking. They fill whatever is left and shrink
             // first when the window narrows.
             DemoTextField {
