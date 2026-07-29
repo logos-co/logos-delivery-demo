@@ -6,7 +6,7 @@ A small `ui_qml` module that demonstrates **how an application uses [`logos-deli
 
 This repo is the runnable companion to the journey doc [**Use the Logos Delivery module API from an app**](https://github.com/logos-co/logos-docs/blob/main/docs/messaging/journeys/use-the-logos-delivery-module-api-from-an-app.md) — every code path in the doc is exercised here, and every interactive control has an info button explaining which `delivery_module` API call it triggers.
 
-Pinned to `logos-delivery-module` [**PR #68 — Reliable Channels API**](https://github.com/logos-co/logos-delivery-module/pull/68) (rev `0fb3a74`), until the channel API lands in a release tag.
+Tracks [`logos-delivery-module`](https://github.com/logos-co/logos-delivery-module) `master`; the exact rev is pinned in `flake.lock`.
 
 ![Screenshot of the demo running on logos.dev](docs/screenshot.png)
 
@@ -49,7 +49,7 @@ lgpm install ./result/logos-logos_delivery_demo-module.lgx --to ./modules
 
 ```
 logos-delivery-demo/
-├── flake.nix                            # pins delivery_module to PR #68 (Reliable Channels API)
+├── flake.nix                            # tracks delivery_module master
 ├── metadata.json                        # type: ui_qml, deps: [delivery_module]
 ├── CMakeLists.txt
 └── src/
@@ -82,12 +82,12 @@ Then subscribe both to the same content topic and send from one — the other fi
 
 The demo specifies no ports, so `logos-delivery-module` defaults them to `0` and the OS assigns free ports per instance — the underlying waku listeners (TCP, discv5, …) don't collide.
 
-`--user-dir` is what keeps the two nodes' **storage** apart: the standalone app hands every module its own directory under `<session dir>/module_data`, and the delivery module points the node's storage there ([logos-delivery-module#72](https://github.com/logos-co/logos-delivery-module/pull/72) — until that lands in the pinned module rev, both instances fall back to a working-directory-relative `./data` and share one SDS database). Without `--user-dir` every instance shares the default application data location, so pass it even once #72 is in.
+`--user-dir` is what keeps the two nodes' **storage** apart: the standalone app hands every module its own directory under `<session dir>/module_data`, and the delivery module points the node's storage there. Without it every instance shares the default application data location.
 
 ## References
 
 - [Journey doc — Use the Logos Delivery module API from an app](https://github.com/logos-co/logos-docs/blob/main/docs/messaging/journeys/use-the-logos-delivery-module-api-from-an-app.md)
-- [`logos-delivery-module` PR #68 — Reliable Channels API](https://github.com/logos-co/logos-delivery-module/pull/68)
+- [`logos-delivery-module`](https://github.com/logos-co/logos-delivery-module) — the module this demo drives
 - [`logos-module-builder` — the Nix flake library this demo builds with](https://github.com/logos-co/logos-module-builder)
 - [Logos module developer guide](https://github.com/logos-co/logos-tutorial/blob/master/logos-developer-guide.md) — full walkthrough of module dev, `LogosResult`, generated wrappers
 - [LIP-23 — content topic format](https://lip.logos.co/messaging/informational/23/topics.html)
