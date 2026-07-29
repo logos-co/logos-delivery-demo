@@ -768,10 +768,11 @@ Item {
         readonly property bool hasArg3: arg3Name.length > 0
 
         Layout.fillWidth: true
-        Layout.preferredHeight: row.implicitHeight + Theme.spacing.medium * 2
-        // Unpainted: the enclosing ApiGroup already frames these, so a card is
-        // just a row. Kept as a Rectangle rather than an Item so the component
-        // stays a drop-in for the group's other children.
+        Layout.preferredHeight: row.implicitHeight
+        // Unpainted and unpadded: the enclosing ApiGroup already frames and
+        // spaces these, so a card is just a row. Kept as a Rectangle rather
+        // than an Item so the component stays a drop-in for the group's other
+        // children.
         color: "transparent"
 
         function invoke() {
@@ -784,7 +785,6 @@ Item {
         RowLayout {
             id: row
             anchors.fill: parent
-            anchors.margins: Theme.spacing.medium
             spacing: Theme.spacing.tiny
 
             LogosText {
