@@ -11,8 +11,15 @@
   };
 
   inputs = {
-    logos-module-builder.url = "github:logos-co/logos-module-builder";
-    delivery_module.url = "github:logos-co/logos-delivery-module/v0.1.3";
+    # Same release logos-delivery-module pins. Below 0.2.5 binary event
+    # payloads arrive empty (logos-cpp-sdk#99).
+    logos-module-builder.url = "github:logos-co/logos-module-builder/0.2.5";
+    # follows keeps the module on our builder: emitter and consumer must agree
+    # on the binary event wire form.
+    delivery_module = {
+      url = "github:logos-co/logos-delivery-module";
+      inputs.logos-module-builder.follows = "logos-module-builder";
+    };
   };
 
   outputs = inputs@{ logos-module-builder, ... }:

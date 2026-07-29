@@ -72,6 +72,26 @@ void LogosDeliveryDemoPlugin::wireEvents()
         if (data.size() < 4) return;
         emit messageErrorNotif(data.at(0).toString(), data.at(1).toString(), data.at(2).toString(), data.at(3).toLongLong());
     });
+
+    m_logos->delivery_module.on("channelMessageReceived", [this](const QVariantList& data) {
+        if (data.size() < 4) return;
+        const QByteArray payload = data.at(2).toByteArray();
+        emit channelMessageReceived(
+            data.at(0).toString(),                       // channelId
+            data.at(1).toString(),                       // senderId
+            QString::fromLatin1(payload.toHex(' ')),     // payload (hex bytes)
+            data.at(3).toLongLong());                    // timestamp (qint64, ns since epoch)
+    });
+
+    m_logos->delivery_module.on("channelMessageSent", [this](const QVariantList& data) {
+        if (data.size() < 3) return;
+        emit channelMessageSentNotif(data.at(0).toString(), data.at(1).toString(), data.at(2).toLongLong());
+    });
+
+    m_logos->delivery_module.on("channelMessageError", [this](const QVariantList& data) {
+        if (data.size() < 4) return;
+        emit channelMessageErrorNotif(data.at(0).toString(), data.at(1).toString(), data.at(2).toString(), data.at(3).toLongLong());
+    });
 }
 
 QString LogosDeliveryDemoPlugin::createNode(QString preset, QString mode)
@@ -86,7 +106,8 @@ QString LogosDeliveryDemoPlugin::createNode(QString preset, QString mode)
     QJsonObject cfg{
         {"logLevel", "INFO"},
         {"mode", mode},
-        {"preset", preset}
+        {"preset", preset},
+        {"entry-layer", "channels"}
     };
     const QString cfgJson = QString::fromUtf8(QJsonDocument(cfg).toJson(QJsonDocument::Compact));
     qInfo() << "logos_delivery_demo: createNode" << cfgJson;
@@ -174,4 +195,50 @@ QString LogosDeliveryDemoPlugin::sendMessage(QString topic, QString payloadHex)
         return QString();
     }
     return r.getString();  // request ID
+}
+
+QString LogosDeliveryDemoPlugin::channelCreate(QString channelId, QString contentTopic, QString senderId)
+{
+    if (!m_logos) return QStringLiteral("Backend not initialised");
+    LogosResult r = m_logos->delivery_module.channelCreate(channelId, contentTopic, senderId);
+    if (!r.success) {
+        setLastError(QStringLiteral("channelCreate(%1) failed: %2").arg(channelId, r.getError()));
+        return r.getError();
+    }
+    return QString();
+}
+
+QString LogosDeliveryDemoPlugin::channelExists(QString channelId)
+{
+    if (!m_logos) return QStringLiteral("Backend not initialised");
+    LogosResult r = m_logos->delivery_module.channelExists(channelId);
+    if (!r.success) {
+        setLastError(QStringLiteral("channelExists(%1) failed: %2").arg(channelId, r.getError()));
+        return QString();
+    }
+    return r.getString();  // "true" / "false", verbatim from the FFI
+}
+
+QString LogosDeliveryDemoPlugin::channelSend(QString channelId, QString payloadHex)
+{
+    if (!m_logos) return QStringLiteral("Backend not initialised");
+    // Same convention as sendMessage().
+    const QByteArray payload = QByteArray::fromHex(payloadHex.toLatin1());
+    LogosResult r = m_logos->delivery_module.channelSend(channelId, payload);
+    if (!r.success) {
+        setLastError(QStringLiteral("channelSend(%1) failed: %2").arg(channelId, r.getError()));
+        return QString();
+    }
+    return r.getString();  // request ID
+}
+
+QString LogosDeliveryDemoPlugin::channelClose(QString channelId)
+{
+    if (!m_logos) return QStringLiteral("Backend not initialised");
+    LogosResult r = m_logos->delivery_module.channelClose(channelId);
+    if (!r.success) {
+        setLastError(QStringLiteral("channelClose(%1) failed: %2").arg(channelId, r.getError()));
+        return r.getError();
+    }
+    return QString();
 }
