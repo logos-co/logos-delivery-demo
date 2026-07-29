@@ -6,7 +6,7 @@
   "description": "Educational UI demo for logos-delivery-module: subscribe to content topics, send and receive messages, see which delivery_module API calls back each interaction.",
   "main": "logos_delivery_demo_plugin",
   "view": "qml/Main.qml",
-  "icon": null,
+  "icon": "src/icons/mail.svg",
   "dependencies": ["delivery_module"],
 
   "nix": {
