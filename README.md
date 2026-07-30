@@ -6,7 +6,7 @@ A small `ui_qml` module that demonstrates **how an application uses [`logos-deli
 
 This repo is the runnable companion to the journey doc [**Use the Logos Delivery module API from an app**](https://github.com/logos-co/logos-docs/blob/main/docs/messaging/journeys/use-the-logos-delivery-module-api-from-an-app.md) — every code path in the doc is exercised here, and every interactive control has an info button explaining which `delivery_module` API call it triggers.
 
-Tracks [`logos-delivery-module`](https://github.com/logos-co/logos-delivery-module) `master`; the exact rev is pinned in `flake.lock`.
+Pinned to `logos-delivery-module` [**`v0.2.0`**](https://github.com/logos-co/logos-delivery-module/tree/v0.2.0).
 
 ![Screenshot of the demo running on logos.dev](docs/screenshot.png)
 
@@ -49,7 +49,7 @@ lgpm install ./result/logos-logos_delivery_demo-module.lgx --to ./modules
 
 ```
 logos-delivery-demo/
-├── flake.nix                            # tracks delivery_module master
+├── flake.nix                            # pins delivery_module to v0.2.0
 ├── metadata.json                        # type: ui_qml, deps: [delivery_module]
 ├── CMakeLists.txt
 └── src/
@@ -87,7 +87,7 @@ The demo specifies no ports, and its layered config gets ephemeral p2p ports fro
 ## References
 
 - [Journey doc — Use the Logos Delivery module API from an app](https://github.com/logos-co/logos-docs/blob/main/docs/messaging/journeys/use-the-logos-delivery-module-api-from-an-app.md)
-- [`logos-delivery-module`](https://github.com/logos-co/logos-delivery-module) — the module this demo drives
+- [`logos-delivery-module` @ v0.2.0](https://github.com/logos-co/logos-delivery-module/tree/v0.2.0) — the module this demo drives
 - [`logos-module-builder` — the Nix flake library this demo builds with](https://github.com/logos-co/logos-module-builder)
 - [Logos module developer guide](https://github.com/logos-co/logos-tutorial/blob/master/logos-developer-guide.md) — full walkthrough of module dev, `LogosResult`, generated wrappers
 - [LIP-23 — content topic format](https://lip.logos.co/messaging/informational/23/topics.html)
