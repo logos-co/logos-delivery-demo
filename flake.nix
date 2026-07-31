@@ -19,7 +19,7 @@
     delivery_module = {
       # v0.2.0 release commit (logos-delivery-module#75 head); flip to the
       # v0.2.0 tag once the release is published.
-      url = "github:logos-co/logos-delivery-module/76221346fdc60bdada2d1cfdebddfc83adcb0603";
+      url = "github:logos-co/logos-delivery-module/c3695b4a81db65d4720e59d8eaf31a75f4d25481";
       inputs.logos-module-builder.follows = "logos-module-builder";
     };
   };
