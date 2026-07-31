@@ -16,6 +16,13 @@ Item {
     // "monospace" to the platform's fixed-pitch font.
     readonly property string monoFont: "monospace"
 
+    // Global payload format, driven by the header dropdown. Payloads cross the
+    // backend boundary and live in the event log canonically as space-separated
+    // hex; UTF-8 is an alternate *view* of the same bytes, applied when reading
+    // the send/channelSend input and when rendering payload fields in the log —
+    // so switching the dropdown re-renders payloads already logged.
+    readonly property bool utf8Payloads: payloadFormatBox.currentIndex === 1
+
     // Single global event log. Each entry is an observed event:
     //   { eventName, direction, config, topic, payload, hash, requestId, errorText, ts }
     property var events: []
@@ -119,6 +126,72 @@ Item {
     function formatTs(ts) {
         if (!ts) return ""
         return Qt.formatDateTime(new Date(Math.floor(ts / 1000000)), "yyyy-MM-dd hh:mm:ss.zzz")
+    }
+
+    // ── Payload format conversion ─────────────────────────────────────────────
+    // The QML JS engine has no TextEncoder/TextDecoder, so UTF-8 is done by
+    // hand. Hex is the canonical form throughout; these only run at the edges.
+
+    // Encode text as UTF-8 bytes rendered as space-separated hex — the form
+    // the backend expects.
+    function utf8ToHex(text) {
+        const bytes = []
+        for (let i = 0; i < text.length; i++) {
+            const cp = text.codePointAt(i)
+            if (cp > 0xFFFF) i++  // skip the low surrogate of an astral pair
+            if (cp < 0x80) bytes.push(cp)
+            else if (cp < 0x800) bytes.push(0xC0 | (cp >> 6), 0x80 | (cp & 0x3F))
+            else if (cp < 0x10000) bytes.push(0xE0 | (cp >> 12), 0x80 | ((cp >> 6) & 0x3F), 0x80 | (cp & 0x3F))
+            else bytes.push(0xF0 | (cp >> 18), 0x80 | ((cp >> 12) & 0x3F), 0x80 | ((cp >> 6) & 0x3F), 0x80 | (cp & 0x3F))
+        }
+        return bytes.map(b => (b < 16 ? "0" : "") + b.toString(16)).join(" ")
+    }
+
+    // Decode a (space-separated) hex byte string as UTF-8 text. Payloads are
+    // arbitrary bytes, so invalid or truncated sequences decode to U+FFFD
+    // instead of breaking the log.
+    function hexToUtf8(hex) {
+        const clean = hex.replace(/[^0-9a-fA-F]/g, "")
+        const bytes = []
+        for (let i = 0; i + 1 < clean.length; i += 2)
+            bytes.push(parseInt(clean.substring(i, i + 2), 16))
+        let out = ""
+        let i = 0
+        while (i < bytes.length) {
+            const b = bytes[i]
+            let cp = 0
+            let extra = 0
+            if (b < 0x80) { cp = b }
+            else if ((b & 0xE0) === 0xC0) { cp = b & 0x1F; extra = 1 }
+            else if ((b & 0xF0) === 0xE0) { cp = b & 0x0F; extra = 2 }
+            else if ((b & 0xF8) === 0xF0) { cp = b & 0x07; extra = 3 }
+            else { out += "�"; i++; continue }
+            if (i + extra >= bytes.length) { out += "�"; i++; continue }
+            let ok = true
+            for (let k = 1; k <= extra; k++) {
+                const c = bytes[i + k]
+                if ((c & 0xC0) !== 0x80) { ok = false; break }
+                cp = (cp << 6) | (c & 0x3F)
+            }
+            if (!ok || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF)) {
+                out += "�"
+                i++
+                continue
+            }
+            out += String.fromCodePoint(cp)
+            i += extra + 1
+        }
+        return out
+    }
+
+    // Payload input field → canonical hex for the backend and the event log.
+    function encodePayload(input) {
+        return utf8Payloads ? utf8ToHex(input) : input
+    }
+
+    // Canonical hex from an event → the selected display format.
+    function formatPayload(hex) {
+        return utf8Payloads ? hexToUtf8(hex) : hex
     }
 
     // ── Method-call invocations (logged as local events) ──────────────────────
@@ -356,6 +429,10 @@ Item {
                         font.pixelSize: Theme.typography.secondaryText
                         color: Theme.palette.textSecondary
                     }
+                    // fillWidth capped at implicitWidth: the value takes only
+                    // its natural width — keeping the info chip attached right
+                    // after the text — but can still shrink (clipped) when the
+                    // window is narrow.
                     SelectableValue {
                         text: root.peerIdValue.length > 0
                               ? root.peerIdValue
@@ -364,11 +441,41 @@ Item {
                         wrapMode: TextEdit.NoWrap
                         clip: true
                         Layout.fillWidth: true
+                        Layout.maximumWidth: implicitWidth
                     }
                     InfoChip {
                         tip: "<b>Peer ID</b> — this node's local libp2p peer identifier.<br><br>"
                            + "Returned by <code>delivery_module.getNodeInfo(\"MyPeerId\")</code>, "
                            + "polled every 3 seconds."
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    LogosText {
+                        text: "Payload format:"
+                        font.pixelSize: Theme.typography.secondaryText
+                        color: Theme.palette.textSecondary
+                    }
+                    LogosComboBox {
+                        id: payloadFormatBox
+                        model: ["HEX", "UTF-8"]
+                        currentIndex: 0
+                        Layout.preferredWidth: 110
+                    }
+                    InfoChip {
+                        tip: "<b>Payload format</b> — global setting for how message payloads "
+                           + "are entered and displayed.<br><br>"
+                           + "<code>HEX</code> — payloads are typed and shown as hex bytes, "
+                           + "e.g. <code>48 65 6c 6c 6f</code>.<br>"
+                           + "<code>UTF-8</code> — payloads are typed as plain text (encoded to "
+                           + "UTF-8 bytes before sending) and event payloads are decoded as "
+                           + "UTF-8 for display; bytes that aren't valid UTF-8 render as "
+                           + "<code>�</code>.<br><br>"
+                           + "This is purely a demo feature, <b>not</b> part of the "
+                           + "<code>logos-delivery-module</code> API — the module always treats "
+                           + "the payload as pure bytes. Switching re-renders payloads already "
+                           + "in the event log, but text already typed in a payload field is "
+                           + "reinterpreted, not converted."
                     }
                 }
 
@@ -538,16 +645,17 @@ Item {
                     MethodCall {
                         methodName: "send"
                         arg1Name: "contentTopic"
-                        arg2Name: "payload (hex)"
+                        arg2Name: root.utf8Payloads ? "payload (UTF-8 text)" : "payload (hex)"
                         callEnabled: root.nodeReady
                         infoTip: "<b>delivery_module.send(contentTopic, payload)</b><br><br>"
-                               + "Publish a message. The payload is raw <b>bytes</b>, not text — "
-                               + "enter it as hex, e.g. <code>48 65 6c 6c 6f</code> or "
-                               + "<code>48656c6c6f</code>.<br><br>"
+                               + "Publish a message. The payload is raw <b>bytes</b> — enter it "
+                               + "in the format selected in the header: hex "
+                               + "(e.g. <code>48 65 6c 6c 6f</code> or <code>48656c6c6f</code>) "
+                               + "or UTF-8 text, encoded to bytes before sending.<br><br>"
                                + "On success the <code>LogosResult.getString()</code> value is the <b>request id</b>; "
                                + "the <code>messageSent</code> and <code>messagePropagated</code> events arrive "
                                + "asynchronously and carry the same request id."
-                        onCall: function(arg1, arg2) { root.callSend(arg1, arg2) }
+                        onCall: function(arg1, arg2) { root.callSend(arg1, root.encodePayload(arg2)) }
                     }
                 }
 
@@ -591,17 +699,18 @@ Item {
                     MethodCall {
                         methodName: "channelSend"
                         arg1Name: "channelId"
-                        arg2Name: "payload (hex)"
+                        arg2Name: root.utf8Payloads ? "payload (UTF-8 text)" : "payload (hex)"
                         callEnabled: root.nodeReady
                         infoTip: "<b>delivery_module.channelSend(channelId, payload)</b><br><br>"
                                + "Send a message on a reliable channel. The payload is raw "
-                               + "<b>bytes</b>, not text — enter it as hex, e.g. "
-                               + "<code>48 65 6c 6c 6f</code> or <code>48656c6c6f</code>.<br><br>"
+                               + "<b>bytes</b> — enter it in the format selected in the header: "
+                               + "hex (e.g. <code>48 65 6c 6c 6f</code> or <code>48656c6c6f</code>) "
+                               + "or UTF-8 text, encoded to bytes before sending.<br><br>"
                                + "On success the <code>LogosResult.getString()</code> value is the <b>request id</b>; "
                                + "<code>channelMessageSent</code> arrives once every segment of the send is "
                                + "confirmed, or <code>channelMessageError</code> if the send finalises with "
                                + "a failed segment — both carry the same request id."
-                        onCall: function(arg1, arg2) { root.callChannelSend(arg1, arg2) }
+                        onCall: function(arg1, arg2) { root.callChannelSend(arg1, root.encodePayload(arg2)) }
                     }
 
                     MethodCall {
@@ -1057,9 +1166,10 @@ Item {
             FieldRow { name: "channelId"; value: evt ? evt.channelId || "" : ""; mono: true }
             FieldRow { name: "senderId";  value: evt ? evt.senderId  || "" : ""; mono: true }
             FieldRow { name: "topic";     value: evt ? evt.topic     || "" : ""; mono: true }
-            // 480 chars of space-separated hex ≈ 160 payload bytes, about two
-            // wrapped lines.
-            FieldRow { name: "payload";   value: evt ? evt.payload   || "" : ""; mono: true; multiline: true; truncateAt: 480 }
+            // Events store the payload as hex; render it in the globally
+            // selected format. 480 chars of space-separated hex ≈ 160 payload
+            // bytes, about two wrapped lines.
+            FieldRow { name: "payload";   value: evt && evt.payload ? root.formatPayload(evt.payload) : ""; mono: true; multiline: true; truncateAt: 480 }
             FieldRow { name: "hash";      value: evt ? evt.hash      || "" : ""; mono: true }
             FieldRow { name: "requestId"; value: evt ? evt.requestId || "" : ""; mono: true }
             FieldRow { name: "result";    value: evt ? evt.result    || "" : ""; mono: true }
