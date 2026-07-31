@@ -266,11 +266,11 @@
         "nix-bundle-lgx": "nix-bundle-lgx"
       },
       "locked": {
-        "lastModified": 1785338613,
-        "narHash": "sha256-70ciV93w6UxzSoxxH6xhVU8bG3rwtlUfQBpDggR5Jhs=",
+        "lastModified": 1785486797,
+        "narHash": "sha256-Ve14/OB0cznHTFubbov/nPddNvZzjJUZ/LQ+H9ZbIE0=",
         "owner": "logos-co",
         "repo": "logos-delivery-module",
-        "rev": "2701c440b4496c3c8e30febb1e15d1cb96722453",
+        "rev": "531e61e11c2cc2f4ff773ba59ccaa86cdf407fc3",
         "type": "github"
       },
       "original": {
@@ -3846,11 +3846,11 @@
         "zerokit": "zerokit"
       },
       "locked": {
-        "lastModified": 1784801161,
-        "narHash": "sha256-9CX+nd5MQXu0xQy+HjC8CvrLG2K7RklU0dqbHIeusGU=",
+        "lastModified": 1785443689,
+        "narHash": "sha256-MHPA2HSHjK6xeo+a1GrDQK80IBMmBShv7W10jZmeykI=",
         "ref": "refs/heads/master",
-        "rev": "8ad99f10f41e813253ba1146efc83ca4cfdb3510",
-        "revCount": 2411,
+        "rev": "f8b036594ea2a36b529e10b584b7d2851a3ac5c8",
+        "revCount": 2425,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/logos-messaging/logos-delivery"
