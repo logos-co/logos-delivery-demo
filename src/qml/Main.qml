@@ -25,6 +25,11 @@ Item {
     readonly property string peerIdValue:   backend ? backend.peerId          : ""
     readonly property string lastErrorValue: backend ? backend.lastError      : ""
     readonly property string deliveryVersionValue: backend ? backend.deliveryVersion : ""
+    // Raw return of delivery_module.version(): "<module version>
+    // (liblogosdelivery version: <lib version>)". The chip shows only the
+    // module part — the lib version already has its own chip.
+    readonly property string moduleVersionValue: backend ? backend.moduleVersion : ""
+    readonly property string moduleVersionShort: moduleVersionValue.split(" (")[0]
 
     Connections {
         target: backend
@@ -277,6 +282,23 @@ Item {
                         text: "Logos Delivery demo"
                         font.pixelSize: Theme.typography.panelTitleText
                         font.weight: Theme.typography.weightBold
+                    }
+
+                    SelectableValue {
+                        text: "delivery_module " + root.moduleVersionShort
+                        visible: root.moduleVersionShort.length > 0
+                        font.family: root.monoFont
+                        font.pixelSize: Theme.typography.secondaryText
+                        color: Theme.palette.textSecondary
+                        wrapMode: TextEdit.NoWrap
+                    }
+                    InfoChip {
+                        visible: root.moduleVersionShort.length > 0
+                        tip: "<b>delivery_module version</b> — the version of "
+                           + "<code>logos-delivery-module</code> itself.<br><br>"
+                           + "Read once after the node starts via "
+                           + "<code>delivery_module.version()</code>, which returned:<br>"
+                           + "<code>" + root.moduleVersionValue + "</code>"
                     }
 
                     SelectableValue {
