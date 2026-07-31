@@ -15,7 +15,7 @@ Tracks [`logos-delivery-module`](https://github.com/logos-co/logos-delivery-modu
 - Declaring `delivery_module` as a Logos module dependency (in `metadata.json` and `flake.nix`)
 - Constructing the typed `LogosModules` wrapper from `LogosAPI*` in `initLogos`
 - Bootstrapping the node from the UI with `createNode(...)` and `start()`, with `LogosResult` checks — the fleet (`logos.test` / `logos.dev`, defaulting to `logos.test`) and node mode (`Core` / `Edge`) are picked from dropdowns
-- Polling `delivery_module.getNodeInfo("MyPeerId")` for my peer ID every 3s, and reading the module version (`version()`) and the `logos-delivery` library version (`getNodeInfo("Version")`) once at startup
+- Polling `delivery_module.getNodeInfo("MyPeerId")` for my peer ID every 3s, and reading the `logos-delivery` library version once at startup (`getNodeInfo("Version")`)
 - Surfacing `connectionStateChanged` as a live status badge
 - The **Reliable Channels API**: `channelCreate(channelId, contentTopic, senderId)` / `channelExists` / `channelSend` / `channelClose`, with the `channelMessageReceived` / `channelMessageSent` / `channelMessageError` events surfaced in the event log
 - A **global event log** that renders every observed event verbatim — `messageReceived`, `messageSent`, `messagePropagated`, `messageError`, `channelMessageReceived`, `channelMessageSent`, `channelMessageError`, plus the local return values of every playground call — colour-coded by event kind, with every field selectable so you can copy hashes, topics, payloads, request ids
