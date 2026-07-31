@@ -80,7 +80,7 @@ nix run . -- --user-dir ~/.local/share/delivery_demo_b
 
 Then subscribe both to the same content topic and send from one — the other fires `messageReceived`. For channels, run `channelCreate` on both with the *same* `channelId`, then `channelSend` from one and watch `channelMessageReceived` on the other.
 
-The demo specifies no ports, so `logos-delivery-module` defaults them to `0` and the OS assigns free ports per instance — the underlying waku listeners (TCP, discv5, …) don't collide.
+The demo specifies no ports, and its layered config gets ephemeral p2p ports from `logos-delivery` (defaulted to `0`), so the OS assigns free ports per instance — the underlying waku listeners (TCP, discv5, …) don't collide.
 
 `--user-dir` is what keeps the two nodes' **storage** apart: the standalone app hands every module its own directory under `<session dir>/module_data`, and the delivery module points the node's storage there. Without it every instance shares the default application data location.
 

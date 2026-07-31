@@ -99,15 +99,16 @@ QString LogosDeliveryDemoPlugin::createNode(QString preset, QString mode)
     if (!m_logos) return QStringLiteral("Backend not initialised");
     if (nodeReady()) return QStringLiteral("Node already created");
 
-    // No port config: logos-delivery-module defaults unspecified ports to 0, so
-    // the OS assigns free ports and two demo instances on one machine don't
-    // collide — no port-shift workaround needed. Preset (logos.dev / logos.test)
-    // and mode (Core / Edge) come from the UI.
+    // No port config: the layered shape gets ephemeral p2p ports (logos-delivery
+    // defaults them to 0), so two demo instances on one machine don't collide.
+    // Keep bare kernel fields (logLevel, entry-layer, ports) out of the top
+    // level — one bare field switches parsing to the legacy flat path, whose
+    // fixed port defaults do collide. Preset (logos.dev / logos.test) and mode
+    // (Core / Edge) come from the UI.
     QJsonObject cfg{
-        {"logLevel", "INFO"},
         {"mode", mode},
         {"preset", preset},
-        {"entry-layer", "channels"}
+        {"messagingOverrides", QJsonObject{{"logLevel", "INFO"}}},
     };
     const QString cfgJson = QString::fromUtf8(QJsonDocument(cfg).toJson(QJsonDocument::Compact));
     qInfo() << "logos_delivery_demo: createNode" << cfgJson;
