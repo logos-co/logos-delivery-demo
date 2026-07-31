@@ -139,6 +139,13 @@ QString LogosDeliveryDemoPlugin::createNode(QString preset, QString mode)
         setDeliveryVersion(version.getString());
     }
 
+    // delivery_module's own version. version() returns a plain string of the
+    // form "<module version> (liblogosdelivery version: <lib version>)" —
+    // store it verbatim; the UI trims the parenthetical since the lib version
+    // is already shown separately. Fetched here rather than in initLogos()
+    // because before createNode the module reports its context uninitialized.
+    setModuleVersion(m_logos->delivery_module.version());
+
     // Poll the node's peer id every 3s — the module only exposes it via
     // getNodeInfo, so we surface it to QML as an auto-synced PROP.
     m_pollTimer = new QTimer(this);
