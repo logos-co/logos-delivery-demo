@@ -393,32 +393,6 @@ Item {
 
                     Item { Layout.fillWidth: true }
 
-                    LogosText {
-                        text: "Payload format:"
-                        font.pixelSize: Theme.typography.secondaryText
-                        color: Theme.palette.textSecondary
-                    }
-                    LogosComboBox {
-                        id: payloadFormatBox
-                        model: ["HEX", "UTF-8"]
-                        currentIndex: 0
-                        Layout.preferredWidth: 110
-                    }
-                    InfoChip {
-                        tip: "<b>Payload format</b> — global setting for how message payloads "
-                           + "are entered and displayed.<br><br>"
-                           + "<code>HEX</code> — payloads are typed and shown as hex bytes, "
-                           + "e.g. <code>48 65 6c 6c 6f</code>.<br>"
-                           + "<code>UTF-8</code> — payloads are typed as plain text (encoded to "
-                           + "UTF-8 bytes before sending) and event payloads are decoded as "
-                           + "UTF-8 for display; bytes that aren't valid UTF-8 render as "
-                           + "<code>�</code>.<br><br>"
-                           + "On the wire the payload is always raw bytes — this only changes "
-                           + "the view. Switching re-renders payloads already in the event log, "
-                           + "but text already typed in a payload field is reinterpreted, "
-                           + "not converted."
-                    }
-
                     LogosBadge {
                         text: root.nodeReady ? root.nodeStatus : "no node — call createNode"
                         // Health from the node's connectionStateChanged event:
@@ -455,6 +429,10 @@ Item {
                         font.pixelSize: Theme.typography.secondaryText
                         color: Theme.palette.textSecondary
                     }
+                    // fillWidth capped at implicitWidth: the value takes only
+                    // its natural width — keeping the info chip attached right
+                    // after the text — but can still shrink (clipped) when the
+                    // window is narrow.
                     SelectableValue {
                         text: root.peerIdValue.length > 0
                               ? root.peerIdValue
@@ -463,11 +441,41 @@ Item {
                         wrapMode: TextEdit.NoWrap
                         clip: true
                         Layout.fillWidth: true
+                        Layout.maximumWidth: implicitWidth
                     }
                     InfoChip {
                         tip: "<b>Peer ID</b> — this node's local libp2p peer identifier.<br><br>"
                            + "Returned by <code>delivery_module.getNodeInfo(\"MyPeerId\")</code>, "
                            + "polled every 3 seconds."
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    LogosText {
+                        text: "Payload format:"
+                        font.pixelSize: Theme.typography.secondaryText
+                        color: Theme.palette.textSecondary
+                    }
+                    LogosComboBox {
+                        id: payloadFormatBox
+                        model: ["HEX", "UTF-8"]
+                        currentIndex: 0
+                        Layout.preferredWidth: 110
+                    }
+                    InfoChip {
+                        tip: "<b>Payload format</b> — global setting for how message payloads "
+                           + "are entered and displayed.<br><br>"
+                           + "<code>HEX</code> — payloads are typed and shown as hex bytes, "
+                           + "e.g. <code>48 65 6c 6c 6f</code>.<br>"
+                           + "<code>UTF-8</code> — payloads are typed as plain text (encoded to "
+                           + "UTF-8 bytes before sending) and event payloads are decoded as "
+                           + "UTF-8 for display; bytes that aren't valid UTF-8 render as "
+                           + "<code>�</code>.<br><br>"
+                           + "This is purely a demo feature, <b>not</b> part of the "
+                           + "<code>logos-delivery-module</code> API — the module always treats "
+                           + "the payload as pure bytes. Switching re-renders payloads already "
+                           + "in the event log, but text already typed in a payload field is "
+                           + "reinterpreted, not converted."
                     }
                 }
 
