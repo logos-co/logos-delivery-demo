@@ -42,6 +42,7 @@ signals:
 
 private:
     void wireEvents();
+    void fetchModuleVersion();
     void refreshNodeInfo();
 
     LogosAPI* m_logosAPI = nullptr;

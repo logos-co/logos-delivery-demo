@@ -32,11 +32,7 @@ Item {
     readonly property string peerIdValue:   backend ? backend.peerId          : ""
     readonly property string lastErrorValue: backend ? backend.lastError      : ""
     readonly property string deliveryVersionValue: backend ? backend.deliveryVersion : ""
-    // Raw return of delivery_module.version(): "<module version>
-    // (liblogosdelivery version: <lib version>)". The chip shows only the
-    // module part — the lib version already has its own chip.
     readonly property string moduleVersionValue: backend ? backend.moduleVersion : ""
-    readonly property string moduleVersionShort: moduleVersionValue.split(" (")[0]
 
     Connections {
         target: backend
@@ -358,20 +354,23 @@ Item {
                     }
 
                     SelectableValue {
-                        text: "delivery_module " + root.moduleVersionShort
-                        visible: root.moduleVersionShort.length > 0
+                        text: "delivery_module " + root.moduleVersionValue
+                        visible: root.moduleVersionValue.length > 0
                         font.family: root.monoFont
                         font.pixelSize: Theme.typography.secondaryText
                         color: Theme.palette.textSecondary
                         wrapMode: TextEdit.NoWrap
                     }
                     InfoChip {
-                        visible: root.moduleVersionShort.length > 0
+                        visible: root.moduleVersionValue.length > 0
                         tip: "<b>delivery_module version</b> — the version of "
-                           + "<code>logos-delivery-module</code> itself.<br><br>"
-                           + "Read once after the node starts via "
-                           + "<code>delivery_module.version()</code>, which returned:<br>"
-                           + "<code>" + root.moduleVersionValue + "</code>"
+                           + "<code>logos-delivery-module</code> as Logos Core knows it: "
+                           + "the <code>version</code> field of the module's embedded "
+                           + "<code>metadata.json</code>, read from the core's module "
+                           + "registry via <code>core_service.getModuleInfo(\"delivery_module\")</code>.<br><br>"
+                           + "Shown only when the host exposes <code>core_service</code> "
+                           + "(the <code>logoscore</code> daemon does; the standalone "
+                           + "preview app doesn't)."
                     }
 
                     SelectableValue {

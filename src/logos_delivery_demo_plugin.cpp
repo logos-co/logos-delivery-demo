@@ -1,5 +1,6 @@
 #include "logos_delivery_demo_plugin.h"
 #include "logos_api.h"
+#include "logos_api_client.h"
 #include "logos_sdk.h"
 #include "logos_types.h"
 
@@ -27,6 +28,8 @@ void LogosDeliveryDemoPlugin::initLogos(LogosAPI* api)
     setBackend(this);
 
     wireEvents();
+
+    fetchModuleVersion();
 
     // The node is no longer bootstrapped automatically — the UI drives it by
     // calling createNode(preset, mode), so the demo can be exercised against
@@ -140,13 +143,6 @@ QString LogosDeliveryDemoPlugin::createNode(QString preset, QString mode)
         setDeliveryVersion(version.getString());
     }
 
-    // delivery_module's own version. version() returns a plain string of the
-    // form "<module version> (liblogosdelivery version: <lib version>)" —
-    // store it verbatim; the UI trims the parenthetical since the lib version
-    // is already shown separately. Fetched here rather than in initLogos()
-    // because before createNode the module reports its context uninitialized.
-    setModuleVersion(m_logos->delivery_module.version());
-
     // Poll the node's peer id every 3s — the module only exposes it via
     // getNodeInfo, so we surface it to QML as an auto-synced PROP.
     m_pollTimer = new QTimer(this);
@@ -156,6 +152,24 @@ QString LogosDeliveryDemoPlugin::createNode(QString preset, QString mode)
     m_pollTimer->start();
 
     return QString();
+}
+
+void LogosDeliveryDemoPlugin::fetchModuleVersion()
+{
+    // delivery_module's version as Logos Core knows it — the "version" field
+    // of the module's embedded metadata.json, read from the core's module
+    // registry via the core_service provider. Modules don't self-report
+    // versions; the core is the authority. core_service is only registered by
+    // the logoscore daemon, so under hosts without it (e.g. the standalone
+    // preview app) the call fails and the version chip stays hidden. Async so
+    // an absent provider can't block startup.
+    m_logosAPI->getClient(QStringLiteral("core_service"))->invokeRemoteMethodAsync(
+        QStringLiteral("core_service"), QStringLiteral("getModuleInfo"),
+        QVariantList{QStringLiteral("delivery_module")},
+        [this](QVariant reply) {
+            const QString ver = reply.toMap().value(QStringLiteral("version")).toString();
+            if (!ver.isEmpty()) setModuleVersion(ver);
+        });
 }
 
 void LogosDeliveryDemoPlugin::refreshNodeInfo()
