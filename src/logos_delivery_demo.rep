@@ -5,7 +5,6 @@ class LogosDeliveryDemo
     PROP(QString lastError="" READONLY)
     PROP(QString peerId="" READONLY)
     PROP(QString deliveryVersion="" READONLY)
-    PROP(QString moduleVersion="" READONLY)
 
     SIGNAL(messageReceived(QString topic, QString payload, QString messageHash, qint64 timestamp))
     SIGNAL(messageSentNotif(QString requestId, QString messageHash, qint64 timestamp))
