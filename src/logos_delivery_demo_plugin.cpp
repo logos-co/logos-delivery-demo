@@ -31,13 +31,37 @@ void LogosDeliveryDemoPlugin::initLogos(LogosAPI* api)
     // The node is no longer bootstrapped automatically — the UI drives it by
     // calling createNode(preset, mode), so the demo can be exercised against
     // different fleets (logos.dev / logos.test) and node modes (Core / Edge).
+    //
+    // The poll runs from here on, not from createNode: delivery_module and its
+    // node are a singleton per Logos Core instance, so the node may equally be
+    // created by another module (e.g. chat_module). Node state is therefore
+    // read from the module, never inferred from who called createNode.
+    m_pollTimer = new QTimer(this);
+    m_pollTimer->setInterval(3000);
+    QObject::connect(m_pollTimer, &QTimer::timeout, this, &LogosDeliveryDemoPlugin::refreshNodeInfo);
+    refreshNodeInfo();
+    m_pollTimer->start();
 }
 
 void LogosDeliveryDemoPlugin::wireEvents()
 {
     m_logos->delivery_module.on("connectionStateChanged", [this](const QVariantList& data) {
-        if (data.isEmpty()) return;
+        if (data.size() < 2) return;
         setConnectionStatus(data.at(0).toString());
+        emit connectionStateChangedNotif(data.at(0).toString(), data.at(1).toLongLong());
+    });
+
+    // The node's lifecycle events. They fire regardless of which module drove
+    // the call, so on a shared node these are also how the demo sees another
+    // module's start / stop.
+    m_logos->delivery_module.on("nodeStarted", [this](const QVariantList& data) {
+        if (data.size() < 3) return;
+        emit nodeStartedNotif(data.at(0).toBool(), data.at(1).toString(), data.at(2).toLongLong());
+    });
+
+    m_logos->delivery_module.on("nodeStopped", [this](const QVariantList& data) {
+        if (data.size() < 3) return;
+        emit nodeStoppedNotif(data.at(0).toBool(), data.at(1).toString(), data.at(2).toLongLong());
     });
 
     m_logos->delivery_module.on("messageReceived", [this](const QVariantList& data) {
@@ -129,35 +153,36 @@ QString LogosDeliveryDemoPlugin::createNode(QString preset, QString mode)
 
     qInfo() << "logos_delivery_demo: Node started successfully";
 
-    setNodeReady(true);
-
-    // logos-delivery (liblogosdelivery) version. Exposed as the "Version"
-    // getNodeInfo attribute — the same call delivery_module's own version()
-    // wraps. It's fixed for the life of the node, so fetch it once here
-    // rather than in the 3s poll below.
-    LogosResult version = m_logos->delivery_module.getNodeInfo(QStringLiteral("Version"));
-    if (version.success) {
-        setDeliveryVersion(version.getString());
-    }
-
-    // Poll the node's peer id every 3s — the module only exposes it via
-    // getNodeInfo, so we surface it to QML as an auto-synced PROP.
-    m_pollTimer = new QTimer(this);
-    m_pollTimer->setInterval(3000);
-    QObject::connect(m_pollTimer, &QTimer::timeout, this, &LogosDeliveryDemoPlugin::refreshNodeInfo);
-    refreshNodeInfo();
-    m_pollTimer->start();
-
     return QString();
 }
 
+// Polled every 3s from init onwards. Every field here is read from
+// delivery_module, so the UI reflects the shared node whoever created it.
 void LogosDeliveryDemoPlugin::refreshNodeInfo()
 {
     if (!m_logos) return;
 
+    // Doubles as the node-exists probe: getNodeInfo fails with "Context not
+    // initialized" until some module has called createNode.
     LogosResult peer = m_logos->delivery_module.getNodeInfo(QStringLiteral("MyPeerId"));
-    if (peer.success) {
-        setPeerId(peer.getString());
+    setNodeReady(peer.success);
+
+    if (!peer.success) {
+        setPeerId(QString());
+        setDeliveryVersion(QString());
+        return;
+    }
+
+    setPeerId(peer.getString());
+
+    // logos-delivery (liblogosdelivery) version. Exposed as the "Version"
+    // getNodeInfo attribute — the same call delivery_module's own version()
+    // wraps. Fixed for the life of the node, so read it once per node.
+    if (deliveryVersion().isEmpty()) {
+        LogosResult version = m_logos->delivery_module.getNodeInfo(QStringLiteral("Version"));
+        if (version.success) {
+            setDeliveryVersion(version.getString());
+        }
     }
 }
 

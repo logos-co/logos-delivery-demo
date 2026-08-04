@@ -104,6 +104,34 @@ Item {
                 ts: timestamp
             })
         }
+        function onConnectionStateChangedNotif(connectionStatus, timestamp) {
+            root.logEvent({
+                eventName: "connectionStateChanged",
+                direction: "in",
+                result: connectionStatus,
+                ts: timestamp
+            })
+        }
+        // The node's lifecycle events. On a shared node these fire for another
+        // module's createNode/start too, so the log shows the whole node's life.
+        function onNodeStartedNotif(success, message, timestamp) {
+            root.logEvent({
+                eventName: "nodeStarted",
+                direction: "in",
+                result: success ? "success" : "failed",
+                errorText: success ? "" : message,
+                ts: timestamp
+            })
+        }
+        function onNodeStoppedNotif(success, message, timestamp) {
+            root.logEvent({
+                eventName: "nodeStopped",
+                direction: "in",
+                result: success ? "success" : "failed",
+                errorText: success ? "" : message,
+                ts: timestamp
+            })
+        }
     }
 
     function logEvent(evt) {
@@ -393,8 +421,11 @@ Item {
                            + "below the healthy relay threshold (yellow).<br>"
                            + "<code>Disconnected</code> — no usable relay connectivity "
                            + "(red).<br><br>"
-                           + "Until the node is created the badge reads "
-                           + "<i>no node — call createNode</i>."
+                           + "Until a node exists the badge reads "
+                           + "<i>no node — call createNode</i>.<br><br>"
+                           + "The event fires on transitions only, so a node that was "
+                           + "already running when this view opened shows no status until "
+                           + "its next change. Every event is also logged above."
                     }
                 }
 
@@ -424,7 +455,8 @@ Item {
                     InfoChip {
                         tip: "<b>Peer ID</b> — this node's local libp2p peer identifier.<br><br>"
                            + "Returned by <code>delivery_module.getNodeInfo(\"MyPeerId\")</code>, "
-                           + "polled every 3 seconds."
+                           + "polled every 3 seconds. The same poll is what tells the demo "
+                           + "whether a node exists at all — whichever module created it."
                     }
 
                     Item { Layout.fillWidth: true }
@@ -562,8 +594,11 @@ Item {
                        + "<b>mode</b> — <code>Core</code> (full relay node) or "
                        + "<code>Edge</code> (light/edge node).<br><br>"
                        + "The node is no longer started automatically, so you can exercise "
-                       + "the module against different fleets and modes. Can be called once "
-                       + "per session."
+                       + "the module against different fleets and modes.<br><br>"
+                       + "Can be called once per Logos Core instance: <code>delivery_module</code> "
+                       + "and its node are a singleton shared by every module. If another "
+                       + "module (e.g. chat) created the node, this call is disabled and the "
+                       + "preset/mode chosen there apply — the demo just uses that node."
                 onCall: function(preset, mode) { root.callCreateNode(preset, mode) }
             }
 
@@ -616,7 +651,10 @@ Item {
                         arg1Name: "contentTopic"
                         callEnabled: root.nodeReady
                         infoTip: "<b>delivery_module.unsubscribe(contentTopic)</b><br><br>"
-                               + "Stop listening on the given topic. Returns a <code>LogosResult</code>."
+                               + "Stop listening on the given topic. Returns a <code>LogosResult</code>.<br><br>"
+                               + "Subscriptions are node-wide and shared with every module "
+                               + "using <code>delivery_module</code> — unsubscribing a topic "
+                               + "another module (e.g. chat) relies on stops its delivery too."
                         onCall: function(arg1, _arg2) { root.callUnsubscribe(arg1) }
                     }
 
@@ -698,7 +736,9 @@ Item {
                         infoTip: "<b>delivery_module.channelClose(channelId)</b><br><br>"
                                + "Close a reliable channel: stops its SDS loops. Persisted state "
                                + "survives, so <code>channelCreate()</code> with the same id restores "
-                               + "the channel."
+                               + "the channel.<br><br>"
+                               + "Channel ids are node-wide — closing an id another module "
+                               + "opened stops that module's channel too."
                         onCall: function(arg1, _arg2) { root.callChannelClose(arg1) }
                     }
                 }
