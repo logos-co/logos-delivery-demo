@@ -123,16 +123,6 @@ Item {
                 ts: timestamp
             })
         }
-        // The demo's own node-exists probe, run when this view opens and after
-        // nodeStarted. Logged because it decides whether the UI shows a node.
-        function onNodeInfoReadNotif(peerId, errorText) {
-            root.logEvent({
-                eventName: "getNodeInfo(\"MyPeerId\") returned",
-                direction: "local",
-                result: peerId,
-                errorText: errorText
-            })
-        }
         function onNodeStoppedNotif(success, message, timestamp) {
             root.logEvent({
                 eventName: "nodeStopped",

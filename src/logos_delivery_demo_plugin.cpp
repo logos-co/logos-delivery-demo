@@ -171,12 +171,6 @@ void LogosDeliveryDemoPlugin::readNodeInfo()
     // Doubles as the node-exists probe: getNodeInfo fails with "Context not
     // initialized" until some module has called createNode.
     LogosResult peer = m_logos->delivery_module.getNodeInfo(QStringLiteral("MyPeerId"));
-
-    // This is the one call the demo makes on its own initiative, and it decides
-    // whether the UI shows a node at all — so log it like any other call.
-    emit nodeInfoReadNotif(peer.success ? peer.getString() : QString(),
-                           peer.success ? QString() : peer.getError());
-
     if (!peer.success) {
         clearNodeInfo();
         return;

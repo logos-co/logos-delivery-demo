@@ -16,7 +16,6 @@ class LogosDeliveryDemo
     SIGNAL(connectionStateChangedNotif(QString connectionStatus, qint64 timestamp))
     SIGNAL(nodeStartedNotif(bool success, QString message, qint64 timestamp))
     SIGNAL(nodeStoppedNotif(bool success, QString message, qint64 timestamp))
-    SIGNAL(nodeInfoReadNotif(QString peerId, QString errorText))
 
     SLOT(QString createNode(QString preset, QString mode))
     SLOT(QString subscribe(QString topic))
