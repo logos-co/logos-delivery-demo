@@ -425,7 +425,8 @@ Item {
                            + "<i>no node — call createNode</i>.<br><br>"
                            + "The event fires on transitions only, so a node that was "
                            + "already running when this view opened shows no status until "
-                           + "its next change. Every event is also logged above."
+                           + "its next change (logos-delivery-module#81 tracks a queryable "
+                           + "status). Every event is also logged above."
                     }
                 }
 
