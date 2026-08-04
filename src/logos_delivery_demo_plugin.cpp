@@ -6,7 +6,6 @@
 #include <QDebug>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QTimer>
 
 LogosDeliveryDemoPlugin::LogosDeliveryDemoPlugin(QObject* parent)
     : LogosDeliveryDemoSimpleSource(parent)
@@ -32,15 +31,12 @@ void LogosDeliveryDemoPlugin::initLogos(LogosAPI* api)
     // calling createNode(preset, mode), so the demo can be exercised against
     // different fleets (logos.dev / logos.test) and node modes (Core / Edge).
     //
-    // The poll runs from here on, not from createNode: delivery_module and its
-    // node are a singleton per Logos Core instance, so the node may equally be
-    // created by another module (e.g. chat_module). Node state is therefore
-    // read from the module, never inferred from who called createNode.
-    m_pollTimer = new QTimer(this);
-    m_pollTimer->setInterval(3000);
-    QObject::connect(m_pollTimer, &QTimer::timeout, this, &LogosDeliveryDemoPlugin::refreshNodeInfo);
-    refreshNodeInfo();
-    m_pollTimer->start();
+    // delivery_module and its node are a singleton per Logos Core instance, so
+    // the node may equally be created by another module (e.g. chat_module) —
+    // possibly before this module loaded. Hence the read here, not just on the
+    // nodeStarted event: node state is read from the module, never inferred
+    // from who called createNode.
+    readNodeInfo();
 }
 
 void LogosDeliveryDemoPlugin::wireEvents()
@@ -57,11 +53,13 @@ void LogosDeliveryDemoPlugin::wireEvents()
     m_logos->delivery_module.on("nodeStarted", [this](const QVariantList& data) {
         if (data.size() < 3) return;
         emit nodeStartedNotif(data.at(0).toBool(), data.at(1).toString(), data.at(2).toLongLong());
+        readNodeInfo();
     });
 
     m_logos->delivery_module.on("nodeStopped", [this](const QVariantList& data) {
         if (data.size() < 3) return;
         emit nodeStoppedNotif(data.at(0).toBool(), data.at(1).toString(), data.at(2).toLongLong());
+        clearNodeInfo();
     });
 
     m_logos->delivery_module.on("messageReceived", [this](const QVariantList& data) {
@@ -156,34 +154,40 @@ QString LogosDeliveryDemoPlugin::createNode(QString preset, QString mode)
     return QString();
 }
 
-// Polled every 3s from init onwards. Every field here is read from
-// delivery_module, so the UI reflects the shared node whoever created it.
-void LogosDeliveryDemoPlugin::refreshNodeInfo()
+// Read the node's fixed attributes. Both are constant for the life of the node
+// — the peer id derives from the node key at construction, the version is a
+// build-time constant of liblogosdelivery — so they are read once per node
+// rather than polled: at init (the node may already exist, created by another
+// module) and on nodeStarted.
+void LogosDeliveryDemoPlugin::readNodeInfo()
 {
     if (!m_logos) return;
 
     // Doubles as the node-exists probe: getNodeInfo fails with "Context not
     // initialized" until some module has called createNode.
     LogosResult peer = m_logos->delivery_module.getNodeInfo(QStringLiteral("MyPeerId"));
-    setNodeReady(peer.success);
-
     if (!peer.success) {
-        setPeerId(QString());
-        setDeliveryVersion(QString());
+        clearNodeInfo();
         return;
     }
-
     setPeerId(peer.getString());
 
     // logos-delivery (liblogosdelivery) version. Exposed as the "Version"
     // getNodeInfo attribute — the same call delivery_module's own version()
-    // wraps. Fixed for the life of the node, so read it once per node.
-    if (deliveryVersion().isEmpty()) {
-        LogosResult version = m_logos->delivery_module.getNodeInfo(QStringLiteral("Version"));
-        if (version.success) {
-            setDeliveryVersion(version.getString());
-        }
+    // wraps.
+    LogosResult version = m_logos->delivery_module.getNodeInfo(QStringLiteral("Version"));
+    if (version.success) {
+        setDeliveryVersion(version.getString());
     }
+
+    setNodeReady(true);
+}
+
+void LogosDeliveryDemoPlugin::clearNodeInfo()
+{
+    setNodeReady(false);
+    setPeerId(QString());
+    setDeliveryVersion(QString());
 }
 
 QString LogosDeliveryDemoPlugin::subscribe(QString topic)

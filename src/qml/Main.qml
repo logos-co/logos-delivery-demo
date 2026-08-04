@@ -455,9 +455,11 @@ Item {
                     }
                     InfoChip {
                         tip: "<b>Peer ID</b> — this node's local libp2p peer identifier.<br><br>"
-                           + "Returned by <code>delivery_module.getNodeInfo(\"MyPeerId\")</code>, "
-                           + "polled every 3 seconds. The same poll is what tells the demo "
-                           + "whether a node exists at all — whichever module created it."
+                           + "Returned by <code>delivery_module.getNodeInfo(\"MyPeerId\")</code>. "
+                           + "Fixed for the life of the node, so it is read once — when this "
+                           + "view opens and on the node's <code>nodeStarted</code> event — "
+                           + "rather than polled. That read is also what tells the demo "
+                           + "whether a node exists at all, whichever module created it."
                     }
 
                     Item { Layout.fillWidth: true }

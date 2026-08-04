@@ -69,7 +69,7 @@ The node is **not** started automatically. Use the `createNode` row in the metho
 
 ### Sharing the node with other modules
 
-`delivery_module` is a singleton per Logos Core instance, and so is its node. The demo never assumes it created that node: node state is polled from the module (`getNodeInfo`) and everything else comes from the module's events. So when another module (e.g. the chat module) creates the node, the demo shows it like any other — peer id, version, live events — and `createNode` is disabled because the node already exists; the fleet/mode chosen by that module apply.
+`delivery_module` is a singleton per Logos Core instance, and so is its node. The demo never assumes it created that node: it reads the node's attributes from the module (`getNodeInfo`) when the view opens and on the `nodeStarted` event, clears them on `nodeStopped`, and takes everything else from the module's events. So when another module (e.g. the chat module) creates the node, the demo shows it like any other — peer id, version, live events — and `createNode` is disabled because the node already exists; the fleet/mode chosen by that module apply.
 
 The flip side of a shared node: the event log shows *all* of the node's traffic, including other modules', and `unsubscribe` / `channelClose` affect topics and channels other modules opened.
 
