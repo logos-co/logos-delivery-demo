@@ -53,13 +53,18 @@ void LogosDeliveryDemoPlugin::wireEvents()
     m_logos->delivery_module.on("nodeStarted", [this](const QVariantList& data) {
         if (data.size() < 3) return;
         emit nodeStartedNotif(data.at(0).toBool(), data.at(1).toString(), data.at(2).toLongLong());
-        readNodeInfo();
+        // Queued, not called inline: event callbacks arrive on delivery_module's
+        // dispatch thread, and the SDK invokes module methods with
+        // Qt::DirectConnection — so a getNodeInfo issued from here would run on
+        // that thread, where its completion callback can't be served, and would
+        // write PROPs off the source's thread. Hop back to ours first.
+        QMetaObject::invokeMethod(this, [this] { readNodeInfo(); }, Qt::QueuedConnection);
     });
 
     m_logos->delivery_module.on("nodeStopped", [this](const QVariantList& data) {
         if (data.size() < 3) return;
         emit nodeStoppedNotif(data.at(0).toBool(), data.at(1).toString(), data.at(2).toLongLong());
-        clearNodeInfo();
+        QMetaObject::invokeMethod(this, [this] { clearNodeInfo(); }, Qt::QueuedConnection);
     });
 
     m_logos->delivery_module.on("messageReceived", [this](const QVariantList& data) {
@@ -166,6 +171,12 @@ void LogosDeliveryDemoPlugin::readNodeInfo()
     // Doubles as the node-exists probe: getNodeInfo fails with "Context not
     // initialized" until some module has called createNode.
     LogosResult peer = m_logos->delivery_module.getNodeInfo(QStringLiteral("MyPeerId"));
+
+    // This is the one call the demo makes on its own initiative, and it decides
+    // whether the UI shows a node at all — so log it like any other call.
+    emit nodeInfoReadNotif(peer.success ? peer.getString() : QString(),
+                           peer.success ? QString() : peer.getError());
+
     if (!peer.success) {
         clearNodeInfo();
         return;
