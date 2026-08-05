@@ -67,6 +67,12 @@ The C++ backend lives in the `ui-host` process; the QML view runs in the host ap
 
 The node is **not** started automatically. Use the `createNode` row in the method-call playground to create and start it against a chosen network: pick the preset — **`logos.test`** (Logos Test Network, the default) or **`logos.dev`** (Logos Dev Network) — and the node **mode** — `Core` (full relay node) or `Edge` (light node). `createNode` can be called once per session; the other API calls stay disabled until the node is ready. To switch fleet/mode, restart the app.
 
+### Sharing the node with other modules
+
+`delivery_module` is a singleton per Logos Core instance, and so is its node. The demo never assumes it created that node: it reads the node's attributes from the module (`getNodeInfo`) when the view opens and on the `nodeStarted` event, clears them on `nodeStopped`, and takes everything else from the module's events. So when another module (e.g. the chat module) creates the node, the demo shows it like any other — peer id, version, live events — and `createNode` is disabled because the node already exists; the fleet/mode chosen by that module apply.
+
+The flip side of a shared node: the event log shows *all* of the node's traffic, including other modules', and `unsubscribe` / `channelClose` affect topics and channels other modules opened.
+
 ### Running multiple instances on one machine
 
 Give each instance its own session directory with `--user-dir`:

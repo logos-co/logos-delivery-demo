@@ -6,7 +6,6 @@
 #include <QDebug>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QTimer>
 
 LogosDeliveryDemoPlugin::LogosDeliveryDemoPlugin(QObject* parent)
     : LogosDeliveryDemoSimpleSource(parent)
@@ -31,13 +30,41 @@ void LogosDeliveryDemoPlugin::initLogos(LogosAPI* api)
     // The node is no longer bootstrapped automatically — the UI drives it by
     // calling createNode(preset, mode), so the demo can be exercised against
     // different fleets (logos.dev / logos.test) and node modes (Core / Edge).
+    //
+    // delivery_module and its node are a singleton per Logos Core instance, so
+    // the node may equally be created by another module (e.g. chat_module) —
+    // possibly before this module loaded. Hence the read here, not just on the
+    // nodeStarted event: node state is read from the module, never inferred
+    // from who called createNode.
+    readNodeInfo();
 }
 
 void LogosDeliveryDemoPlugin::wireEvents()
 {
     m_logos->delivery_module.on("connectionStateChanged", [this](const QVariantList& data) {
-        if (data.isEmpty()) return;
+        if (data.size() < 2) return;
         setConnectionStatus(data.at(0).toString());
+        emit connectionStateChangedNotif(data.at(0).toString(), data.at(1).toLongLong());
+    });
+
+    // The node's lifecycle events. They fire regardless of which module drove
+    // the call, so on a shared node these are also how the demo sees another
+    // module's start / stop.
+    m_logos->delivery_module.on("nodeStarted", [this](const QVariantList& data) {
+        if (data.size() < 3) return;
+        emit nodeStartedNotif(data.at(0).toBool(), data.at(1).toString(), data.at(2).toLongLong());
+        // Queued, not called inline: event callbacks arrive on delivery_module's
+        // dispatch thread, and the SDK invokes module methods with
+        // Qt::DirectConnection — so a getNodeInfo issued from here would run on
+        // that thread, where its completion callback can't be served, and would
+        // write PROPs off the source's thread. Hop back to ours first.
+        QMetaObject::invokeMethod(this, [this] { readNodeInfo(); }, Qt::QueuedConnection);
+    });
+
+    m_logos->delivery_module.on("nodeStopped", [this](const QVariantList& data) {
+        if (data.size() < 3) return;
+        emit nodeStoppedNotif(data.at(0).toBool(), data.at(1).toString(), data.at(2).toLongLong());
+        QMetaObject::invokeMethod(this, [this] { clearNodeInfo(); }, Qt::QueuedConnection);
     });
 
     m_logos->delivery_module.on("messageReceived", [this](const QVariantList& data) {
@@ -129,36 +156,43 @@ QString LogosDeliveryDemoPlugin::createNode(QString preset, QString mode)
 
     qInfo() << "logos_delivery_demo: Node started successfully";
 
-    setNodeReady(true);
+    return QString();
+}
+
+// Read the node's fixed attributes. Both are constant for the life of the node
+// — the peer id derives from the node key at construction, the version is a
+// build-time constant of liblogosdelivery — so they are read once per node
+// rather than polled: at init (the node may already exist, created by another
+// module) and on nodeStarted.
+void LogosDeliveryDemoPlugin::readNodeInfo()
+{
+    if (!m_logos) return;
+
+    // Doubles as the node-exists probe: getNodeInfo fails with "Context not
+    // initialized" until some module has called createNode.
+    LogosResult peer = m_logos->delivery_module.getNodeInfo(QStringLiteral("MyPeerId"));
+    if (!peer.success) {
+        clearNodeInfo();
+        return;
+    }
+    setPeerId(peer.getString());
 
     // logos-delivery (liblogosdelivery) version. Exposed as the "Version"
     // getNodeInfo attribute — the same call delivery_module's own version()
-    // wraps. It's fixed for the life of the node, so fetch it once here
-    // rather than in the 3s poll below.
+    // wraps.
     LogosResult version = m_logos->delivery_module.getNodeInfo(QStringLiteral("Version"));
     if (version.success) {
         setDeliveryVersion(version.getString());
     }
 
-    // Poll the node's peer id every 3s — the module only exposes it via
-    // getNodeInfo, so we surface it to QML as an auto-synced PROP.
-    m_pollTimer = new QTimer(this);
-    m_pollTimer->setInterval(3000);
-    QObject::connect(m_pollTimer, &QTimer::timeout, this, &LogosDeliveryDemoPlugin::refreshNodeInfo);
-    refreshNodeInfo();
-    m_pollTimer->start();
-
-    return QString();
+    setNodeReady(true);
 }
 
-void LogosDeliveryDemoPlugin::refreshNodeInfo()
+void LogosDeliveryDemoPlugin::clearNodeInfo()
 {
-    if (!m_logos) return;
-
-    LogosResult peer = m_logos->delivery_module.getNodeInfo(QStringLiteral("MyPeerId"));
-    if (peer.success) {
-        setPeerId(peer.getString());
-    }
+    setNodeReady(false);
+    setPeerId(QString());
+    setDeliveryVersion(QString());
 }
 
 QString LogosDeliveryDemoPlugin::subscribe(QString topic)
