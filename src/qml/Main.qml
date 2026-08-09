@@ -495,15 +495,21 @@ Item {
                 Rectangle {
                     visible: root.lastErrorValue.length > 0
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 28
+                    // Grows past the one-line 28px so long errors wrap instead
+                    // of being cut off at the border.
+                    Layout.preferredHeight: Math.max(28, lastErrorText.implicitHeight + Theme.spacing.small * 2)
                     radius: Theme.spacing.radiusSmall
                     color: Qt.rgba(Theme.palette.error.r, Theme.palette.error.g, Theme.palette.error.b, 0.15)
                     border.width: 1
                     border.color: Theme.palette.error
                     LogosText {
-                        anchors.fill: parent
+                        id: lastErrorText
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
                         anchors.leftMargin: Theme.spacing.small
-                        verticalAlignment: Text.AlignVCenter
+                        anchors.rightMargin: Theme.spacing.small
+                        wrapMode: Text.Wrap
                         text: root.lastErrorValue
                         color: Theme.palette.error
                         font.pixelSize: Theme.typography.primaryText
@@ -1194,7 +1200,7 @@ Item {
             FieldRow { name: "hash";      value: evt ? evt.hash      || "" : ""; mono: true }
             FieldRow { name: "requestId"; value: evt ? evt.requestId || "" : ""; mono: true }
             FieldRow { name: "result";    value: evt ? evt.result    || "" : ""; mono: true }
-            FieldRow { name: "error";     value: evt ? evt.errorText || "" : ""; isError: true }
+            FieldRow { name: "error";     value: evt ? evt.errorText || "" : ""; isError: true; multiline: true }
         }
     }
 
@@ -1231,7 +1237,10 @@ Item {
             }
             font.family: mono ? root.monoFont : Theme.typography.publicSans
             color: isError ? Theme.palette.error : Theme.palette.text
-            wrapMode: multiline ? TextEdit.WrapAnywhere : TextEdit.NoWrap
+            // Hex/mono values have no word boundaries worth keeping; error
+            // prose reads better broken at spaces.
+            wrapMode: !multiline ? TextEdit.NoWrap
+                                 : mono ? TextEdit.WrapAnywhere : TextEdit.Wrap
             Layout.fillWidth: true
         }
     }
