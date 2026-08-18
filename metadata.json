@@ -2,12 +2,18 @@
   "name": "logos_delivery_demo",
   "version": "0.2.0",
   "type": "ui_qml",
+  "interface": "universal",
   "category": "messaging",
   "description": "Educational UI demo for logos-delivery-module: subscribe to content topics, send and receive messages, see which delivery_module API calls back each interaction.",
   "main": "logos_delivery_demo_plugin",
   "view": "qml/Main.qml",
   "icon": "src/icons/mail.svg",
   "dependencies": ["delivery_module"],
+  "codegen": {
+    "rep": "src/logos_delivery_demo.rep",
+    "backend_class": "LogosDeliveryDemoBackend",
+    "backend_header": "LogosDeliveryDemoBackend.h"
+  },
 
   "nix": {
     "packages": { "build": [], "runtime": [] },

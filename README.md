@@ -13,7 +13,7 @@ Pinned to `logos-delivery-module` [**`v0.2.0`**](https://github.com/logos-co/log
 ## What it shows
 
 - Declaring `delivery_module` as a Logos module dependency (in `metadata.json` and `flake.nix`)
-- Constructing the typed `LogosModules` wrapper from `LogosAPI*` in `initLogos`
+- Reaching `delivery_module` through the typed `modules()` accessor of `LogosUiPluginContext`, armed in `onContextReady()` — the `LogosAPI*`/`initLogos` plumbing is generated, not hand-written
 - Bootstrapping the node from the UI with `createNode(...)` and `start()`, with `LogosResult` checks — the fleet (`logos.test` / `logos.dev`, defaulting to `logos.test`) and node mode (`Core` / `Edge`) are picked from dropdowns
 - Polling `delivery_module.getNodeInfo("MyPeerId")` for my peer ID every 3s, and reading the `logos-delivery` library version once at startup (`getNodeInfo("Version")`)
 - Surfacing `connectionStateChanged` as a live status badge
@@ -50,16 +50,22 @@ lgpm install ./result/logos-logos_delivery_demo-module.lgx --to ./modules
 ```
 logos-delivery-demo/
 ├── flake.nix                            # pins delivery_module to v0.2.0
-├── metadata.json                        # type: ui_qml, deps: [delivery_module]
+├── metadata.json                        # type: ui_qml, interface: universal, deps: [delivery_module]
 ├── CMakeLists.txt
 └── src/
-    ├── logos_delivery_demo.rep          # Qt Remote Objects contract
-    ├── logos_delivery_demo_interface.h  # plugin interface (discovery)
-    ├── logos_delivery_demo_plugin.h     # C++ backend
-    ├── logos_delivery_demo_plugin.cpp   # wires delivery_module events → QML, exposes slots
+    ├── logos_delivery_demo.rep          # Qt Remote Objects contract (the view contract)
+    ├── LogosDeliveryDemoBackend.h       # C++ backend
+    ├── LogosDeliveryDemoBackend.cpp     # wires delivery_module events → QML, exposes slots
     └── qml/
         └── Main.qml                     # the UI
 ```
+
+The plugin interface and the `initLogos` plugin glue are **generated** at build time
+(`interface: "universal"` + the `codegen` block in `metadata.json`), so they are not in
+the tree: `logos-qt-generator --backend ui` emits `logos_delivery_demo_ui_interface.h`
+and `logos_delivery_demo_ui_glue.{h,cpp}` into `generated_code/`. What stays hand-written
+is the `.rep` and the backend, which derives `LogosDeliveryDemoSimpleSource` (from the
+`.rep`) plus `LogosUiPluginContext` (for `modules()` and `onContextReady()`).
 
 The C++ backend lives in the `ui-host` process; the QML view runs in the host application. They communicate over Qt Remote Objects (auto-generated from `logos_delivery_demo.rep`).
 

@@ -3,3 +3,6 @@ result
 
 # SDS runtime state written by the running demo (sqlite db)
 data/
+
+# Build-time codegen (interface: universal emits the plugin glue here)
+generated_code/
