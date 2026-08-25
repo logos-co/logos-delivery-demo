@@ -275,7 +275,7 @@
       },
       "original": {
         "owner": "logos-co",
-        "ref": "master",
+        "ref": "v0.2.1",
         "repo": "logos-delivery-module",
         "type": "github"
       }
