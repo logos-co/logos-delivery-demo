@@ -132,15 +132,13 @@ QString LogosDeliveryDemoPlugin::createNode(QString preset, QString mode, QStrin
     // level — one bare field switches parsing to the legacy flat path, whose
     // fixed port defaults do collide. Preset (logos.dev / logos.test), mode
     // (Core / Edge) and anonymity level come from the UI.
-    QJsonObject messagingOverrides{{"logLevel", "INFO"}};
-    if (!anonymityLevel.isEmpty() && anonymityLevel != QStringLiteral("None")) {
-        messagingOverrides.insert("anonymityLevel", anonymityLevel);
-    }
-
     QJsonObject cfg{
         {"mode", mode},
         {"preset", preset},
-        {"messagingOverrides", messagingOverrides},
+        {"messagingOverrides", QJsonObject{
+            {"logLevel", "INFO"},
+            {"anonymityLevel", anonymityLevel},
+        }},
     };
     const QString cfgJson = QString::fromUtf8(QJsonDocument(cfg).toJson(QJsonDocument::Compact));
     qInfo() << "logos_delivery_demo: createNode" << cfgJson;
