@@ -121,7 +121,7 @@ void LogosDeliveryDemoPlugin::wireEvents()
     });
 }
 
-QString LogosDeliveryDemoPlugin::createNode(QString preset, QString mode)
+QString LogosDeliveryDemoPlugin::createNode(QString preset, QString mode, QString anonymityLevel)
 {
     if (!m_logos) return QStringLiteral("Backend not initialised");
     if (nodeReady()) return QStringLiteral("Node already created");
@@ -130,12 +130,17 @@ QString LogosDeliveryDemoPlugin::createNode(QString preset, QString mode)
     // defaults them to 0), so two demo instances on one machine don't collide.
     // Keep bare kernel fields (logLevel, entry-layer, ports) out of the top
     // level — one bare field switches parsing to the legacy flat path, whose
-    // fixed port defaults do collide. Preset (logos.dev / logos.test) and mode
-    // (Core / Edge) come from the UI.
+    // fixed port defaults do collide. Preset (logos.dev / logos.test), mode
+    // (Core / Edge) and anonymity level come from the UI.
+    QJsonObject messagingOverrides{{"logLevel", "INFO"}};
+    if (!anonymityLevel.isEmpty() && anonymityLevel != QStringLiteral("None")) {
+        messagingOverrides.insert("anonymityLevel", anonymityLevel);
+    }
+
     QJsonObject cfg{
         {"mode", mode},
         {"preset", preset},
-        {"messagingOverrides", QJsonObject{{"logLevel", "INFO"}}},
+        {"messagingOverrides", messagingOverrides},
     };
     const QString cfgJson = QString::fromUtf8(QJsonDocument(cfg).toJson(QJsonDocument::Compact));
     qInfo() << "logos_delivery_demo: createNode" << cfgJson;

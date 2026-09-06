@@ -27,7 +27,7 @@ public:
 
     Q_INVOKABLE void initLogos(LogosAPI* api);
 
-    QString createNode(QString preset, QString mode) override;
+    QString createNode(QString preset, QString mode, QString anonymityLevel) override;
     QString subscribe(QString topic) override;
     QString unsubscribe(QString topic) override;
     QString sendMessage(QString topic, QString payloadHex) override;
