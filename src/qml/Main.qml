@@ -1035,9 +1035,37 @@ Item {
         }
     }
 
+    // One createNode argument: the parameter name above its value picker. The
+    // other rows name their arguments through a text field's placeholder, which
+    // a combo box has nowhere to put.
+    component ArgCombo: ColumnLayout {
+        id: argCombo
+
+        property string label: ""
+        property alias model: box.model
+        readonly property alias currentText: box.currentText
+        readonly property alias controlHeight: box.height
+
+        spacing: Theme.spacing.tiny
+        Layout.fillWidth: true
+        Layout.minimumWidth: 120
+
+        LogosText {
+            text: argCombo.label
+            font.family: root.monoFont
+            font.pixelSize: Theme.typography.secondaryText
+            color: Theme.palette.textSecondary
+        }
+        LogosComboBox {
+            id: box
+            currentIndex: 0
+            Layout.fillWidth: true
+        }
+    }
+
     // ── createNode playground row ─────────────────────────────────────────────
-    // Like MethodCall, but the two arguments are fixed-choice enums, so they are
-    // picked from dropdowns rather than typed:
+    // Like MethodCall, but the three arguments are fixed-choice enums, so they
+    // are picked from labelled dropdowns rather than typed:
     //   createNode ( [logos.dev ▾], [Core ▾], [None ▾] ) [Call] [?]
     component CreateNodeCall: Rectangle {
         id: cn
@@ -1066,66 +1094,79 @@ Item {
                 font.pixelSize: Theme.typography.primaryText
                 font.weight: Theme.typography.weightBold
                 color: Theme.palette.primary
+                verticalAlignment: Text.AlignVCenter
+                Layout.alignment: Qt.AlignBottom
+                Layout.preferredHeight: presetBox.controlHeight
             }
             LogosText {
                 text: "("
                 font.family: root.monoFont
                 font.pixelSize: Theme.typography.primaryText
                 color: Theme.palette.textSecondary
+                verticalAlignment: Text.AlignVCenter
+                Layout.alignment: Qt.AlignBottom
+                Layout.preferredHeight: presetBox.controlHeight
             }
-            LogosComboBox {
+            ArgCombo {
                 id: presetBox
+                label: "preset"
                 // logos.test is the default fleet.
                 model: ["logos.test", "logos.dev"]
-                currentIndex: 0
                 enabled: cn.callEnabled
-                Layout.fillWidth: true
-                Layout.minimumWidth: 120
             }
             LogosText {
                 text: ","
                 font.family: root.monoFont
                 font.pixelSize: Theme.typography.primaryText
                 color: Theme.palette.textSecondary
+                verticalAlignment: Text.AlignVCenter
+                Layout.alignment: Qt.AlignBottom
+                Layout.preferredHeight: presetBox.controlHeight
             }
-            LogosComboBox {
+            ArgCombo {
                 id: modeBox
+                label: "mode"
                 model: ["Core", "Edge"]
-                currentIndex: 0
                 enabled: cn.callEnabled
-                Layout.fillWidth: true
-                Layout.minimumWidth: 120
             }
             LogosText {
                 text: ","
                 font.family: root.monoFont
                 font.pixelSize: Theme.typography.primaryText
                 color: Theme.palette.textSecondary
+                verticalAlignment: Text.AlignVCenter
+                Layout.alignment: Qt.AlignBottom
+                Layout.preferredHeight: presetBox.controlHeight
             }
-            LogosComboBox {
+            ArgCombo {
                 id: anonymityBox
+                label: "anonymityLevel"
                 model: ["None", "Preferred", "Required"]
-                currentIndex: 0
                 enabled: cn.callEnabled
-                Layout.fillWidth: true
-                Layout.minimumWidth: 120
             }
             LogosText {
                 text: ")"
                 font.family: root.monoFont
                 font.pixelSize: Theme.typography.primaryText
                 color: Theme.palette.textSecondary
+                verticalAlignment: Text.AlignVCenter
+                Layout.alignment: Qt.AlignBottom
+                Layout.preferredHeight: presetBox.controlHeight
             }
             DemoButton {
                 text: "Call"
                 Layout.preferredWidth: 72
                 Layout.preferredHeight: 40
+                Layout.alignment: Qt.AlignBottom
                 implicitWidth: 72
                 implicitHeight: 40
                 enabled: cn.callEnabled
                 onClicked: cn.call(presetBox.currentText, modeBox.currentText, anonymityBox.currentText)
             }
-            InfoChip { tip: cn.infoTip }
+            InfoChip {
+                tip: cn.infoTip
+                Layout.alignment: Qt.AlignBottom
+            }
         }
     }
 
