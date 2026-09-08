@@ -17,7 +17,7 @@
     # follows keeps the module on our builder: emitter and consumer must agree
     # on the binary event wire form.
     delivery_module = {
-      url = "github:logos-co/logos-delivery-module/v0.2.1";
+      url = "github:logos-co/logos-delivery-module/606747f2fcdd6e37a004e9a3435a924b87c1e8fb";
       inputs.logos-module-builder.follows = "logos-module-builder";
     };
   };

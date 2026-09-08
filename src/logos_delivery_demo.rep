@@ -17,7 +17,7 @@ class LogosDeliveryDemo
     SIGNAL(nodeStartedNotif(bool success, QString message, qint64 timestamp))
     SIGNAL(nodeStoppedNotif(bool success, QString message, qint64 timestamp))
 
-    SLOT(QString createNode(QString preset, QString mode))
+    SLOT(QString createNode(QString preset, QString mode, QString anonymityLevel))
     SLOT(QString subscribe(QString topic))
     SLOT(QString unsubscribe(QString topic))
     SLOT(QString sendMessage(QString topic, QString payloadHex))
