@@ -27,6 +27,7 @@ public:
 
     Q_INVOKABLE void initLogos(LogosAPI* api);
 
+    QString configureRln(QString registryId, QString rlnIdentifier, QString epochSizeSec) override;
     QString createNode(QString preset, QString mode, QString anonymityLevel) override;
     QString subscribe(QString topic) override;
     QString unsubscribe(QString topic) override;

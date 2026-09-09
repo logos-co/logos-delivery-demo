@@ -219,6 +219,21 @@ Item {
 
     // ── Method-call invocations (logged as local events) ──────────────────────
 
+    function callConfigureRln(registryId, rlnIdentifier, epochSizeSec) {
+        if (!registryId || !rlnIdentifier) return
+        logos.watch(backend.configureRln(registryId, rlnIdentifier, epochSizeSec),
+            function(errStr) {
+                root.logEvent({
+                    eventName: "configureRln() returned",
+                    direction: "local",
+                    config: registryId,
+                    errorText: errStr || ""
+                })
+            },
+            function(_e) {}
+        )
+    }
+
     function callCreateNode(preset, mode, anonymity) {
         if (!preset || !mode || !anonymity) return
         logos.watch(backend.createNode(preset, mode, anonymity),
@@ -613,6 +628,27 @@ Item {
                        + "module (e.g. chat) created the node, this call is disabled and the "
                        + "preset/mode chosen there apply — the demo just uses that node."
                 onCall: function(preset, mode, anonymity) { root.callCreateNode(preset, mode, anonymity) }
+            }
+
+            MethodCall {
+                methodName: "configureRln"
+                arg1Name: "registryId"
+                arg2Name: "rlnIdentifier"
+                arg3Name: "epochSizeSec"
+                callEnabled: root.backend && !root.nodeReady
+                infoTip: "<b>delivery_module.configureRln(config)</b><br><br>"
+                       + "Turn RLN on for this node. Module-only: the delivery library's "
+                       + "RLN plugin is implementation-agnostic — it carries no config and "
+                       + "names no registry — so this is where the membership is named.<br>"
+                       + "<b>registryId</b> — CAIP-10 account id of the registry deployment, "
+                       + "e.g. <code>logos:testnet:0</code>.<br>"
+                       + "<b>rlnIdentifier</b> — 32-byte hex per-application id; every node of "
+                       + "a deployment must use the same one.<br>"
+                       + "<b>epochSizeSec</b> — optional; blank leaves the module's default.<br><br>"
+                       + "Must be called <i>before</i> <code>createNode()</code>: an installed "
+                       + "plugin is what makes the library mount RLN, and it reads that at node "
+                       + "creation. Without this call the node comes up with RLN off."
+                onCall: function(arg1, arg2, arg3) { root.callConfigureRln(arg1, arg2, arg3) }
             }
 
             SplitView {

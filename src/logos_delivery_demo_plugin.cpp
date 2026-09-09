@@ -121,6 +121,39 @@ void LogosDeliveryDemoPlugin::wireEvents()
     });
 }
 
+QString LogosDeliveryDemoPlugin::configureRln(QString registryId, QString rlnIdentifier,
+                                             QString epochSizeSec)
+{
+    if (!m_logos) return QStringLiteral("Backend not initialised");
+    if (nodeReady()) return QStringLiteral("Node already created");
+
+    QJsonObject cfg{
+        {"registry-id", registryId.trimmed()},
+        {"rln-identifier", rlnIdentifier.trimmed()},
+    };
+
+    const QString epochText = epochSizeSec.trimmed();
+    if (!epochText.isEmpty()) {
+        bool epochOk = false;
+        const qint64 epoch = epochText.toLongLong(&epochOk);
+        if (!epochOk || epoch <= 0) return QStringLiteral("epochSizeSec must be a positive integer");
+        cfg.insert(QStringLiteral("epoch-size-sec"), epoch);
+    }
+
+    const QString cfgJson = QString::fromUtf8(QJsonDocument(cfg).toJson(QJsonDocument::Compact));
+    qInfo() << "logos_delivery_demo: configureRln" << cfgJson;
+
+    LogosResult configured = m_logos->delivery_module.configureRln(cfgJson);
+    if (!configured.success) {
+        setLastError(QStringLiteral("configureRln failed: %1").arg(configured.getError()));
+        return configured.getError();
+    }
+
+    qInfo() << "logos_delivery_demo: configureRln succeeded";
+
+    return QString();
+}
+
 QString LogosDeliveryDemoPlugin::createNode(QString preset, QString mode, QString anonymityLevel)
 {
     if (!m_logos) return QStringLiteral("Backend not initialised");

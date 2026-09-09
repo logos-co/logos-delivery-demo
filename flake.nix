@@ -16,8 +16,10 @@
     logos-module-builder.url = "github:logos-co/logos-module-builder/0.2.5";
     # follows keeps the module on our builder: emitter and consumer must agree
     # on the binary event wire form.
+    # DRAFT: logos-delivery-module#94 (impl-plugable-rln-api-module), which adds
+    # configureRln. Repin to a release tag before merging.
     delivery_module = {
-      url = "github:logos-co/logos-delivery-module/606747f2fcdd6e37a004e9a3435a924b87c1e8fb";
+      url = "github:logos-co/logos-delivery-module/d104408ab5065ec14ff28f088d86453cf4f6fcdf";
       inputs.logos-module-builder.follows = "logos-module-builder";
     };
   };
