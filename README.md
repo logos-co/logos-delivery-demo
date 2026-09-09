@@ -15,11 +15,12 @@ Pinned to `logos-delivery-module` [**`v0.2.0`**](https://github.com/logos-co/log
 - Declaring `delivery_module` as a Logos module dependency (in `metadata.json` and `flake.nix`)
 - Constructing the typed `LogosModules` wrapper from `LogosAPI*` in `initLogos`
 - Bootstrapping the node from the UI with `createNode(...)` and `start()`, with `LogosResult` checks — the fleet (`logos.test` / `logos.dev`, defaulting to `logos.test`), node mode (`Core` / `Edge`) and sender anonymity level (`None` / `Preferred` / `Required`) are picked from dropdowns
+- Turning RLN on for that node with `configureRln(registryId, rlnIdentifier, epochSizeSec)` — a `delivery_module` method of its own, called *before* `createNode`, because the delivery library's RLN plugin names no registry and carries no config
 - Polling `delivery_module.getNodeInfo("MyPeerId")` for my peer ID every 3s, and reading the `logos-delivery` library version once at startup (`getNodeInfo("Version")`)
 - Surfacing `connectionStateChanged` as a live status badge
 - The **Reliable Channels API**: `channelCreate(channelId, contentTopic, senderId)` / `channelExists` / `channelSend` / `channelClose`, with the `channelMessageReceived` / `channelMessageSent` / `channelMessageError` events surfaced in the event log
 - A **global event log** that renders every observed event verbatim — `messageReceived`, `messageSent`, `messagePropagated`, `messageError`, `channelMessageReceived`, `channelMessageSent`, `channelMessageError`, plus the local return values of every playground call — colour-coded by event kind, with every field selectable so you can copy hashes, topics, payloads, request ids
-- A **method-call playground** at the bottom: one card per public `delivery_module` API call, rendered as `methodName(arg…)` with a `Call` button — every interaction is reflected as a row in the event log above. `createNode` spans the full width on top; below it the calls are grouped side by side into **Messaging** (`subscribe`, `unsubscribe`, `send`) and **Reliable Channels** (`channelCreate`, `channelExists`, `channelSend`, `channelClose`). `createNode`'s three arguments are fixed-choice enums picked from dropdowns; message payloads are raw **bytes**: a global **Payload format** dropdown in the header switches between **HEX** and **UTF-8** for both payload entry and how payloads render in the event log (switching re-renders payloads already logged)
+- A **method-call playground** at the bottom: one card per public `delivery_module` API call, rendered as `methodName(arg…)` with a `Call` button — every interaction is reflected as a row in the event log above. It follows the node's two phases: while there is no node it shows only **Configuration** (`configureRln`, then `createNode`), and once the node is up it swaps that panel for the API panels — **Messaging** (`subscribe`, `unsubscribe`, `send`) and **Reliable Channels** (`channelCreate`, `channelExists`, `channelSend`, `channelClose`) side by side. `createNode`'s three arguments are fixed-choice enums picked from dropdowns; message payloads are raw **bytes**: a global **Payload format** dropdown in the header switches between **HEX** and **UTF-8** for both payload entry and how payloads render in the event log (switching re-renders payloads already logged)
 - An info `?` chip next to every interactive element with a tooltip spelling out the exact `delivery_module` call behind it — the demo doubles as live API documentation
 - Using **[`Logos.Theme`](https://github.com/logos-co/logos-design-system) and `Logos.Controls`** for tokens, colors, and themed components — no hard-coded styling in the demo
 
@@ -49,7 +50,7 @@ lgpm install ./result/logos-logos_delivery_demo-module.lgx --to ./modules
 
 ```
 logos-delivery-demo/
-├── flake.nix                            # pins delivery_module to v0.2.0
+├── flake.nix                            # pins delivery_module
 ├── metadata.json                        # type: ui_qml, deps: [delivery_module]
 ├── CMakeLists.txt
 └── src/
@@ -65,7 +66,11 @@ The C++ backend lives in the `ui-host` process; the QML view runs in the host ap
 
 ## Network
 
-The node is **not** started automatically. Use the `createNode` row in the method-call playground to create and start it against a chosen network: pick the preset — **`logos.test`** (Logos Test Network, the default) or **`logos.dev`** (Logos Dev Network) — the node **mode** — `Core` (full relay node) or `Edge` (light node) — and the sender **anonymity level** — `None` (send directly), `Preferred` or `Required`, where anything above `None` mounts mix and routes sends over it. `createNode` can be called once per session; the other API calls stay disabled until the node is ready. To switch fleet/mode, restart the app.
+The node is **not** started automatically. On start-up the playground shows only the **Configuration** panel. Use its `createNode` row to create and start the node against a chosen network: pick the preset — **`logos.test`** (Logos Test Network, the default) or **`logos.dev`** (Logos Dev Network) — the node **mode** — `Core` (full relay node) or `Edge` (light node) — and the sender **anonymity level** — `None` (send directly), `Preferred` or `Required`, where anything above `None` mounts mix and routes sends over it. Once the node is ready the Configuration panel gives way to the Messaging and Reliable Channels panels. `createNode` can be called once per session; to switch fleet/mode, restart the app.
+
+### RLN
+
+To bring the node up with RLN on, call `configureRln` **before** `createNode` — the row above it in the Configuration panel. It takes a **`registryId`** (CAIP-10 account id of the registry deployment, e.g. `logos:testnet:0`), an **`rlnIdentifier`** (per-application id, exactly 64 hex characters) and an optional **`epochSizeSec`**. RLN never rides the `createNode` config: the delivery library asks an external RLN module for every RLN operation and its plugin names no registry, so the module is the only place a membership is named — and installing that plugin is what makes the library mount RLN, which it reads at node creation. Without the call the node comes up with RLN off. The node's membership must already be active; registration happens out of band, through the RLN module, and `createNode` fails at start without one.
 
 ### Sharing the node with other modules
 

@@ -226,7 +226,7 @@ Item {
                 root.logEvent({
                     eventName: "configureRln() returned",
                     direction: "local",
-                    config: registryId,
+                    config: registryId + " / " + rlnIdentifier,
                     errorText: errStr || ""
                 })
             },
@@ -604,56 +604,75 @@ Item {
         }
 
         // ─── Method-call playground ──────────────────────────────────────────
+        // Configuring the node and using it are disjoint phases — every
+        // configuration call is refused once the node exists, every API call
+        // before it — so only the panels of the current phase are shown.
         ColumnLayout {
             Layout.fillWidth: true
             spacing: Theme.spacing.small
 
-            CreateNodeCall {
-                callEnabled: root.backend && !root.nodeReady
-                infoTip: "<b>delivery_module.createNode(config)</b> + <b>start()</b><br><br>"
-                       + "Create and start the node against a chosen network.<br>"
-                       + "<b>preset</b> — <code>logos.dev</code> (Logos Dev Network) or "
-                       + "<code>logos.test</code> (Logos Test Network); both auto-configure "
-                       + "cluster id, entry nodes, sharding and RLN.<br>"
-                       + "<b>mode</b> — <code>Core</code> (full relay node) or "
-                       + "<code>Edge</code> (light/edge node).<br>"
-                       + "<b>anonymityLevel</b> — sender anonymity through mix: "
-                       + "<code>None</code> (send directly), <code>Preferred</code> or "
-                       + "<code>Required</code>; anything above <code>None</code> mounts mix "
-                       + "and sends over it.<br><br>"
-                       + "The node is no longer started automatically, so you can exercise "
-                       + "the module against different fleets and modes.<br><br>"
-                       + "Can be called once per Logos Core instance: <code>delivery_module</code> "
-                       + "and its node are a singleton shared by every module. If another "
-                       + "module (e.g. chat) created the node, this call is disabled and the "
-                       + "preset/mode chosen there apply — the demo just uses that node."
-                onCall: function(preset, mode, anonymity) { root.callCreateNode(preset, mode, anonymity) }
-            }
+            ApiGroup {
+                title: "Configuration"
+                visible: !root.nodeReady
+                Layout.fillWidth: true
 
-            MethodCall {
-                methodName: "configureRln"
-                arg1Name: "registryId"
-                arg2Name: "rlnIdentifier"
-                arg3Name: "epochSizeSec"
-                callEnabled: root.backend && !root.nodeReady
-                infoTip: "<b>delivery_module.configureRln(config)</b><br><br>"
-                       + "Turn RLN on for this node. Module-only: the delivery library's "
-                       + "RLN plugin is implementation-agnostic — it carries no config and "
-                       + "names no registry — so this is where the membership is named.<br>"
-                       + "<b>registryId</b> — CAIP-10 account id of the registry deployment, "
-                       + "e.g. <code>logos:testnet:0</code>.<br>"
-                       + "<b>rlnIdentifier</b> — 32-byte hex per-application id; every node of "
-                       + "a deployment must use the same one.<br>"
-                       + "<b>epochSizeSec</b> — optional; blank leaves the module's default.<br><br>"
-                       + "Must be called <i>before</i> <code>createNode()</code>: an installed "
-                       + "plugin is what makes the library mount RLN, and it reads that at node "
-                       + "creation. Without this call the node comes up with RLN off."
-                onCall: function(arg1, arg2, arg3) { root.callConfigureRln(arg1, arg2, arg3) }
+                MethodCall {
+                    methodName: "configureRln"
+                    arg1Name: "registryId"
+                    arg2Name: "rlnIdentifier"
+                    arg3Name: "epochSizeSec"
+                    arg3Optional: true
+                    callEnabled: root.backend && !root.nodeReady
+                    infoTip: "<b>delivery_module.configureRln(config)</b><br><br>"
+                           + "Turn RLN on for the node this demo is about to create.<br>"
+                           + "<b>registryId</b> — CAIP-10 account id of the registry "
+                           + "deployment, e.g. <code>logos:testnet:0</code>.<br>"
+                           + "<b>rlnIdentifier</b> — per-application id, exactly 64 hex "
+                           + "characters (32 bytes); every node of a deployment must use "
+                           + "the same one.<br>"
+                           + "<b>epochSizeSec</b> — optional; blank leaves the module's "
+                           + "default.<br><br>"
+                           + "Module-only: the delivery library's RLN plugin is "
+                           + "implementation-agnostic — it names no registry and carries no "
+                           + "config — so this is the one place a membership is named. It "
+                           + "never rides the <code>createNode</code> config.<br><br>"
+                           + "Must be called <i>before</i> <code>createNode()</code>: an "
+                           + "installed plugin is what makes the library mount RLN, and it "
+                           + "reads that at node creation. Without this call the node comes "
+                           + "up with RLN off.<br><br>"
+                           + "The node's membership must already be active — registration "
+                           + "happens out of band, through the RLN module. Without one, "
+                           + "<code>createNode</code> fails at start."
+                    onCall: function(arg1, arg2, arg3) { root.callConfigureRln(arg1, arg2, arg3) }
+                }
+
+                CreateNodeCall {
+                    callEnabled: root.backend && !root.nodeReady
+                    infoTip: "<b>delivery_module.createNode(config)</b> + <b>start()</b><br><br>"
+                           + "Create and start the node against a chosen network.<br>"
+                           + "<b>preset</b> — <code>logos.dev</code> (Logos Dev Network) or "
+                           + "<code>logos.test</code> (Logos Test Network); both auto-configure "
+                           + "cluster id, entry nodes, sharding and RLN.<br>"
+                           + "<b>mode</b> — <code>Core</code> (full relay node) or "
+                           + "<code>Edge</code> (light/edge node).<br>"
+                           + "<b>anonymityLevel</b> — sender anonymity through mix: "
+                           + "<code>None</code> (send directly), <code>Preferred</code> or "
+                           + "<code>Required</code>; anything above <code>None</code> mounts mix "
+                           + "and sends over it.<br><br>"
+                           + "The node is no longer started automatically, so you can exercise "
+                           + "the module against different fleets and modes.<br><br>"
+                           + "Can be called once per Logos Core instance: <code>delivery_module</code> "
+                           + "and its node are a singleton shared by every module. If another "
+                           + "module (e.g. chat) created the node, this call is disabled and the "
+                           + "preset/mode chosen there apply — the demo just uses that node."
+                    onCall: function(preset, mode, anonymity) { root.callCreateNode(preset, mode, anonymity) }
+                }
             }
 
             SplitView {
                 id: apiSplit
 
+                visible: root.nodeReady
                 Layout.fillWidth: true
                 Layout.preferredHeight: Math.max(messagingGroup.implicitHeight,
                                                  channelsGroup.implicitHeight)
@@ -958,6 +977,7 @@ Item {
     // Renders as:
     //   methodName ( [arg1____], [arg2____], [arg3____] ) [Call] [?]
     // arg2 and arg3 are optional; fields with an empty name are not shown.
+    // arg3Optional additionally lets a shown arg3 be submitted blank.
     component MethodCall: Rectangle {
         id: mc
 
@@ -965,6 +985,7 @@ Item {
         property string arg1Name: ""
         property string arg2Name: ""
         property string arg3Name: ""
+        property bool   arg3Optional: false
         property string infoTip: ""
         property bool   callEnabled: true
 
@@ -1064,7 +1085,7 @@ Item {
                 enabled: mc.callEnabled
                          && arg1Field.text.length > 0
                          && (!mc.hasArg2 || arg2Field.text.length > 0)
-                         && (!mc.hasArg3 || arg3Field.text.length > 0)
+                         && (!mc.hasArg3 || mc.arg3Optional || arg3Field.text.length > 0)
                 onClicked: mc.invoke()
             }
             InfoChip { tip: mc.infoTip }
@@ -1112,16 +1133,12 @@ Item {
         signal call(string preset, string mode, string anonymity)
 
         Layout.fillWidth: true
-        Layout.preferredHeight: cnRow.implicitHeight + Theme.spacing.medium * 2
-        color: Theme.palette.backgroundSecondary
-        radius: Theme.spacing.radiusMedium
-        border.width: 1
-        border.color: Theme.palette.borderHairline
+        Layout.preferredHeight: cnRow.implicitHeight
+        color: "transparent"
 
         RowLayout {
             id: cnRow
             anchors.fill: parent
-            anchors.margins: Theme.spacing.medium
             spacing: Theme.spacing.tiny
 
             LogosText {
