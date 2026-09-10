@@ -19,7 +19,7 @@
     # #94 (configureRln) and the module dependency-chain fix are on master but
     # not yet tagged, so this pins the merge commit. Repin to a release tag.
     delivery_module = {
-      url = "github:logos-co/logos-delivery-module/a2ba1c03b7612910f5d866f412a690cb3c505ecd";
+      url = "github:logos-co/logos-delivery-module/514fa12655ddfe0bc3e961dc823ceaa32210f26a";
       inputs.logos-module-builder.follows = "logos-module-builder";
     };
   };
