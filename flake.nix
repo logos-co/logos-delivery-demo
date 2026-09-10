@@ -21,7 +21,12 @@
     delivery_module = {
       url = "github:logos-co/logos-delivery-module/514fa12655ddfe0bc3e961dc823ceaa32210f26a";
       inputs.logos-module-builder.follows = "logos-module-builder";
+      inputs.liblogos_rln_module.follows = "liblogos_rln_module";
     };
+    # The demo reads RLN state itself, so it needs its own generated client:
+    # the builder resolves a declared dependency only from a same-named input.
+    # delivery_module follows this one — two instances would bundle twice.
+    liblogos_rln_module.url = "git+https://github.com/logos-co/logos-rln-modules?ref=feat/lip-alignment&dir=logos-rln-module";
   };
 
   outputs = inputs@{ logos-module-builder, ... }:

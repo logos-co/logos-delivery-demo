@@ -3,10 +3,12 @@
 #include "logos_sdk.h"
 #include "logos_types.h"
 
+#include <QDateTime>
 #include <QDebug>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonParseError>
+#include <QMetaObject>
 
 LogosDeliveryDemoPlugin::LogosDeliveryDemoPlugin(QObject* parent)
     : LogosDeliveryDemoSimpleSource(parent)
@@ -120,6 +122,120 @@ void LogosDeliveryDemoPlugin::wireEvents()
         if (data.size() < 4) return;
         emit channelMessageErrorNotif(data.at(0).toString(), data.at(1).toString(), data.at(2).toString(), data.at(3).toLongLong());
     });
+
+    // The delivery library asks for one proof per outbound message and one
+    // validation per inbound one, so these are the node's live RLN traffic.
+    // They keep firing even though the in-process bridge answers them.
+    m_logos->delivery_module.on("dispatchRlnGenerateProofRequestEvent", [this](const QVariantList& data) {
+        if (data.size() < 6) return;
+        setRlnProofs(rlnProofs() + 1);
+        emit rlnProofRequested(data.at(3).toString(), data.at(4).toLongLong(), data.at(5).toLongLong());
+        pollRlnQuota();
+    });
+    m_logos->delivery_module.on("dispatchRlnValidateProofRequestEvent", [this](const QVariantList& data) {
+        if (data.size() < 7) return;
+        setRlnValidations(rlnValidations() + 1);
+        emit rlnValidationRequested(data.at(3).toString(), data.at(4).toLongLong(), data.at(6).toLongLong());
+    });
+
+    // A push from the RLN module's confirmation poller. get_membership_state
+    // stays the authority, so this only wakes an immediate re-read.
+    m_logos->liblogos_rln_module.onMembership_state_changed(
+        [this](const QString& registryId, const QString& rlnIdentifier,
+               const QString& membershipHash, const QString& state, const QString& previous) {
+            if (registryId != m_rlnRegistryId) return;
+            Q_UNUSED(rlnIdentifier);
+            QMetaObject::invokeMethod(this, [this, membershipHash, state, previous]() {
+                emit rlnMembershipTransition(membershipHash, state, previous);
+                pollRlnMembership();
+            }, Qt::QueuedConnection);
+        });
+}
+
+// liblogos_rln_module answers `result` methods with the value as a QVariantMap
+// and `tstr` methods with a JSON string, so both shapes reach this.
+static QJsonObject rlnObject(const QVariant& value)
+{
+    if (value.canConvert<QVariantMap>() && value.typeId() != QMetaType::QString) {
+        return QJsonObject::fromVariantMap(value.toMap());
+    }
+    return QJsonDocument::fromJson(value.toString().toUtf8()).object();
+}
+
+// The module reports a failed `tstr` call in band, as {"error":{…}}.
+static QString rlnInBandError(const QJsonObject& obj)
+{
+    const QJsonObject err = obj.value(QStringLiteral("error")).toObject();
+    if (err.isEmpty()) return QString();
+    return QStringLiteral("%1: %2")
+        .arg(err.value(QStringLiteral("kind")).toString(),
+             err.value(QStringLiteral("message")).toString());
+}
+
+void LogosDeliveryDemoPlugin::startRlnPolling()
+{
+    if (m_rlnQuotaTimer) return;
+
+    // The quota is a local read, so it can be cheap and frequent; the
+    // membership state costs a registry read, and matches the 10s the RLN
+    // membership UI polls at.
+    m_rlnQuotaTimer = new QTimer(this);
+    m_rlnQuotaTimer->setInterval(2000);
+    connect(m_rlnQuotaTimer, &QTimer::timeout, this, &LogosDeliveryDemoPlugin::pollRlnQuota);
+    m_rlnQuotaTimer->start();
+
+    m_rlnMembershipTimer = new QTimer(this);
+    m_rlnMembershipTimer->setInterval(10000);
+    connect(m_rlnMembershipTimer, &QTimer::timeout, this, &LogosDeliveryDemoPlugin::pollRlnMembership);
+    m_rlnMembershipTimer->start();
+
+    pollRlnQuota();
+    pollRlnMembership();
+}
+
+void LogosDeliveryDemoPlugin::pollRlnQuota()
+{
+    if (!m_logos || m_rlnRegistryId.isEmpty()) return;
+
+    // The same clock reading a send would stamp on its message: the epoch is
+    // derived from the timestamp, not from the module's own clock.
+    const QString now = QString::number(QDateTime::currentSecsSinceEpoch());
+    m_logos->liblogos_rln_module.get_epoch_quotaAsync(
+        m_rlnRegistryId, m_rlnIdentifier, now, [this](LogosResult result) {
+            QMetaObject::invokeMethod(this, [this, result]() {
+                if (!result.success) {
+                    setRlnStatus(result.getError());
+                    setRlnRemaining(-1);
+                    return;
+                }
+                const QJsonObject obj = rlnObject(result.value);
+                setRlnEpochIndex(QString::number(
+                    static_cast<qint64>(obj.value(QStringLiteral("epoch_index")).toDouble())));
+                setRlnRateLimit(obj.value(QStringLiteral("rate_limit")).toInt());
+                setRlnRemaining(obj.value(QStringLiteral("remaining")).toInt());
+                setRlnStatus(QString());
+            }, Qt::QueuedConnection);
+        });
+}
+
+void LogosDeliveryDemoPlugin::pollRlnMembership()
+{
+    if (!m_logos || m_rlnRegistryId.isEmpty()) return;
+
+    m_logos->liblogos_rln_module.get_membership_stateAsync(
+        m_rlnRegistryId, m_rlnIdentifier, [this](QString reply) {
+            QMetaObject::invokeMethod(this, [this, reply]() {
+                const QJsonObject obj = QJsonDocument::fromJson(reply.toUtf8()).object();
+                const QString err = rlnInBandError(obj);
+                if (!err.isEmpty()) {
+                    setRlnStatus(err);
+                    setRlnMembershipState(QStringLiteral("unknown"));
+                    return;
+                }
+                setRlnMembershipState(obj.value(QStringLiteral("state")).toString());
+                setRlnMembershipHash(obj.value(QStringLiteral("membership_hash")).toString());
+            }, Qt::QueuedConnection);
+        });
 }
 
 QString LogosDeliveryDemoPlugin::configureRln(QString registryId, QString rlnIdentifier,
@@ -133,13 +249,12 @@ QString LogosDeliveryDemoPlugin::configureRln(QString registryId, QString rlnIde
         {"rln-identifier", rlnIdentifier.trimmed()},
     };
 
-    const QString epochText = epochSizeSec.trimmed();
-    if (!epochText.isEmpty()) {
-        bool epochOk = false;
-        const qint64 epoch = epochText.toLongLong(&epochOk);
-        if (!epochOk || epoch <= 0) return QStringLiteral("epochSizeSec must be a positive integer");
-        cfg.insert(QStringLiteral("epoch-size-sec"), epoch);
-    }
+    // Not optional: liblogos_rln_module.start() refuses a config without it,
+    // and delivery_module only forwards the key when it is set.
+    bool epochOk = false;
+    const qint64 epoch = epochSizeSec.trimmed().toLongLong(&epochOk);
+    if (!epochOk || epoch <= 0) return QStringLiteral("epochSizeSec must be a positive integer");
+    cfg.insert(QStringLiteral("epoch-size-sec"), epoch);
 
     const QString cfgJson = QString::fromUtf8(QJsonDocument(cfg).toJson(QJsonDocument::Compact));
     qInfo() << "logos_delivery_demo: configureRln" << cfgJson;
@@ -151,6 +266,12 @@ QString LogosDeliveryDemoPlugin::configureRln(QString registryId, QString rlnIde
     }
 
     qInfo() << "logos_delivery_demo: configureRln succeeded";
+
+    m_rlnRegistryId = registryId.trimmed();
+    m_rlnIdentifier = rlnIdentifier.trimmed();
+    setRlnEpochSizeSec(static_cast<int>(epoch));
+    setRlnConfigured(true);
+    startRlnPolling();
 
     return QString();
 }

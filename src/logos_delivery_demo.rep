@@ -7,6 +7,17 @@ class LogosDeliveryDemo
     PROP(QString multiaddrs="" READONLY)
     PROP(QString deliveryVersion="" READONLY)
 
+    PROP(bool rlnConfigured=false READONLY)
+    PROP(QString rlnMembershipState="" READONLY)
+    PROP(QString rlnMembershipHash="" READONLY)
+    PROP(int rlnRateLimit=0 READONLY)
+    PROP(int rlnRemaining=-1 READONLY)
+    PROP(QString rlnEpochIndex="" READONLY)
+    PROP(int rlnEpochSizeSec=0 READONLY)
+    PROP(QString rlnStatus="" READONLY)
+    PROP(int rlnProofs=0 READONLY)
+    PROP(int rlnValidations=0 READONLY)
+
     SIGNAL(messageReceived(QString topic, QString payload, QString messageHash, qint64 timestamp))
     SIGNAL(messageSentNotif(QString requestId, QString messageHash, qint64 timestamp))
     SIGNAL(messagePropagatedNotif(QString requestId, QString messageHash, qint64 timestamp))
@@ -17,6 +28,9 @@ class LogosDeliveryDemo
     SIGNAL(connectionStateChangedNotif(QString connectionStatus, qint64 timestamp))
     SIGNAL(nodeStartedNotif(bool success, QString message, qint64 timestamp))
     SIGNAL(nodeStoppedNotif(bool success, QString message, qint64 timestamp))
+    SIGNAL(rlnProofRequested(QString signalHex, qint64 epochTimestamp, qint64 timestamp))
+    SIGNAL(rlnValidationRequested(QString signalHex, qint64 epochTimestamp, qint64 timestamp))
+    SIGNAL(rlnMembershipTransition(QString membershipHash, QString state, QString previous))
 
     SLOT(QString configureRln(QString registryId, QString rlnIdentifier, QString epochSizeSec))
     SLOT(QString createNode(QString preset, QString mode, QString anonymityLevel))

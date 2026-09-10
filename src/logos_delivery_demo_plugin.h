@@ -3,6 +3,7 @@
 
 #include <QString>
 #include <QVariantList>
+#include <QTimer>
 #include "logos_delivery_demo_interface.h"
 #include "LogosViewPluginBase.h"
 #include "rep_logos_delivery_demo_source.h"
@@ -47,8 +48,17 @@ private:
     void readNodeInfo();
     void clearNodeInfo();
 
+    void startRlnPolling();
+    void pollRlnQuota();
+    void pollRlnMembership();
+
     LogosAPI* m_logosAPI = nullptr;
     LogosModules* m_logos = nullptr;
+
+    QString m_rlnRegistryId;
+    QString m_rlnIdentifier;
+    QTimer* m_rlnQuotaTimer = nullptr;
+    QTimer* m_rlnMembershipTimer = nullptr;
 };
 
 #endif // LOGOS_DELIVERY_DEMO_PLUGIN_H

@@ -21,7 +21,7 @@ Pinned to `logos-delivery-module` [**`v0.2.0`**](https://github.com/logos-co/log
 - Surfacing `connectionStateChanged` as a live status badge
 - The **Reliable Channels API**: `channelCreate(channelId, contentTopic, senderId)` / `channelExists` / `channelSend` / `channelClose`, with the `channelMessageReceived` / `channelMessageSent` / `channelMessageError` events surfaced in the event log
 - A **global event log** that renders every observed event verbatim — `messageReceived`, `messageSent`, `messagePropagated`, `messageError`, `channelMessageReceived`, `channelMessageSent`, `channelMessageError`, plus the local return values of every playground call — colour-coded by event kind, with every field selectable so you can copy hashes, topics, payloads, request ids
-- A **method-call playground** at the bottom: one card per public `delivery_module` API call, rendered as `methodName(arg…)` with a `Call` button — every interaction is reflected as a row in the event log above. It follows the node's two phases: while there is no node it shows only **Configuration** (`configureRln`, then `createNode`), and once the node is up it swaps that panel for the API panels — **Messaging** (`subscribe`, `unsubscribe`, `send`) and **Reliable Channels** (`channelCreate`, `channelExists`, `channelSend`, `channelClose`) side by side. `createNode`'s three arguments are fixed-choice enums picked from dropdowns; message payloads are raw **bytes**: a global **Payload format** dropdown in the header switches between **HEX** and **UTF-8** for both payload entry and how payloads render in the event log (switching re-renders payloads already logged)
+- A **method-call playground** at the bottom: one card per public `delivery_module` API call, rendered as `methodName(arg…)` with a `Call` button — every interaction is reflected as a row in the event log above. It follows the node's two phases: while there is no node it shows only **Configuration** (`configureRln`, then `createNode`), and once the node is up it swaps that panel for the API panels — **Messaging** (`subscribe`, `unsubscribe`, `send`) and **Reliable Channels** (`channelCreate`, `channelExists`, `channelSend`, `channelClose`) side by side. Once `configureRln` has run, an **RLN** panel sits between them and stays across both phases, showing the membership state and the epoch budget live. `createNode`'s three arguments are fixed-choice enums picked from dropdowns, unless **Advanced config** in the header swaps them for the raw config; message payloads are raw **bytes**: a global **Payload format** dropdown in the header switches between **HEX** and **UTF-8** for both payload entry and how payloads render in the event log (switching re-renders payloads already logged)
 - An info `?` chip next to every interactive element with a tooltip spelling out the exact `delivery_module` call behind it — the demo doubles as live API documentation
 - Using **[`Logos.Theme`](https://github.com/logos-co/logos-design-system) and `Logos.Controls`** for tokens, colors, and themed components — no hard-coded styling in the demo
 
@@ -71,11 +71,28 @@ The node is **not** started automatically. On start-up the playground shows only
 
 ### RLN
 
-To bring the node up with RLN on, call `configureRln` **before** `createNode` — the row above it in the Configuration panel. It takes a **`registryId`** (CAIP-10 account id of the registry deployment, e.g. `logos:testnet:0`), an **`rlnIdentifier`** (per-application id, exactly 64 hex characters) and an optional **`epochSizeSec`**. RLN never rides the `createNode` config: the delivery library asks an external RLN module for every RLN operation and its plugin names no registry, so the module is the only place a membership is named — and installing that plugin is what makes the library mount RLN, which it reads at node creation. Without the call the node comes up with RLN off. The node's membership must already be active; registration happens out of band, through the RLN module, and `createNode` fails at start without one.
+To bring the node up with RLN on, call `configureRln` **before** `createNode` — the row above it in the Configuration panel. All three arguments come prefilled with this demo's defaults:
+
+| argument | default | what it is |
+| --- | --- | --- |
+| `registryId` | `logos:testnet:ffa111d7…a219` | CAIP-10 account id of the registry deployment. In the `logos` namespace the account is the registration program's config PDA, and must be the full 64 hex characters — a short form like `logos:testnet:0` is rejected. This is the deployed testnet registry, the same one the RLN membership UI registers against. |
+| `rlnIdentifier` | `3a1ae1c9…f824` | The application id, exactly 64 hex characters (32 bytes) — here `sha256("logos-delivery-demo")`. It is bound into every proof's external nullifier, so nodes only validate each other's proofs when they share it. |
+| `epochSizeSec` | `120` | The application's rate-limit epoch. **Required** — `liblogos_rln_module.start()` rejects a config without it, and every proof generator and verifier of a deployment must agree on the value. |
+
+RLN never rides the `createNode` config: the delivery library asks an external RLN module for every RLN operation and its plugin names no registry, so the module is the only place a membership is named — and installing that plugin is what makes the library mount RLN, which it reads at node creation. Without the call the node comes up with RLN off. The node's membership must already be active; registration happens out of band, through the RLN module, and `createNode` fails at start without one.
+
+#### The RLN panel
+
+Once `configureRln` succeeds an **RLN** panel appears and stays for the rest of the session, live on both sides of `createNode`. It reads `liblogos_rln_module` directly — the demo declares it as a dependency of its own, alongside `delivery_module`, so it gets a generated client for it:
+
+- **Membership** — `get_membership_state(registryId, rlnIdentifier)`, re-read every 10 s and immediately on the module's `membership_state_changed` push. `active` and `grace_period` can generate proofs; `pending` is a submitted registration still confirming; `unknown` means nothing resolves for the scope and `createNode` will fail at start.
+- **Messages left this epoch** — `get_epoch_quota(registryId, rlnIdentifier, timestamp)`, polled every 2 s and again on every proof the node generates. This is the budget still unspent over the membership's rate limit. The read is purely local and advisory: `generate_proof` remains the allocation authority, so a send can still fail `budget_exhausted` if the budget went between the read and the proof. A rate limit of `0` always means no usable membership rather than an exhausted budget.
+- **Epoch** — `floor(timestamp / epochSizeSec)`, the index encoded into every proof's external nullifier, with a countdown to the next boundary computed locally from the same wall clock. The budget resets when it wraps.
+- **Proofs / validations** — counted from `delivery_module`'s `dispatchRlnGenerateProofRequestEvent` and `dispatchRlnValidateProofRequestEvent`: one proof per outbound message, one validation per inbound one. Both also land in the event log. The delivery library asks an external RLN module for every RLN operation, and these events keep firing even though the module's in-process bridge is what answers them.
 
 ### Talking to a local node instead of a fleet
 
-Both presets bootstrap off Status-hosted entry nodes. To peer two nodes directly — two demo instances on one machine, or a node you are running yourself — turn on **Advanced** in the Configuration panel and give `createNode` the config yourself:
+Both presets bootstrap off Status-hosted entry nodes. To peer two nodes directly — two demo instances on one machine, or a node you are running yourself — turn on **Advanced config** in the header and give `createNode` the config yourself:
 
 ```json
 {

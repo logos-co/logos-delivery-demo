@@ -7,7 +7,7 @@
   "main": "logos_delivery_demo_plugin",
   "view": "qml/Main.qml",
   "icon": "src/icons/mail.svg",
-  "dependencies": ["delivery_module"],
+  "dependencies": ["delivery_module", "liblogos_rln_module"],
 
   "nix": {
     "packages": { "build": [], "runtime": [] },
