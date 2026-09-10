@@ -788,49 +788,52 @@ Item {
                     onCall: function(arg1, arg2, arg3) { root.callConfigureRln(arg1, arg2, arg3) }
                 }
 
-                CreateNodeCall {
-                    visible: !advancedNodeConfig.checked
-                    callEnabled: root.backend && !root.nodeReady
-                    infoTip: "<b>delivery_module.createNode(config)</b> + <b>start()</b><br><br>"
-                           + "Create and start the node against a chosen network.<br>"
-                           + "<b>preset</b> — <code>logos.dev</code> (Logos Dev Network) or "
-                           + "<code>logos.test</code> (Logos Test Network); both auto-configure "
-                           + "cluster id, entry nodes, sharding and RLN.<br>"
-                           + "<b>mode</b> — <code>Core</code> (full relay node) or "
-                           + "<code>Edge</code> (light/edge node).<br>"
-                           + "<b>anonymityLevel</b> — sender anonymity through mix: "
-                           + "<code>None</code> (send directly), <code>Preferred</code> or "
-                           + "<code>Required</code>; anything above <code>None</code> mounts mix "
-                           + "and sends over it.<br><br>"
-                           + "The node is no longer started automatically, so you can exercise "
-                           + "the module against different fleets and modes.<br><br>"
-                           + "Can be called once per Logos Core instance: <code>delivery_module</code> "
-                           + "and its node are a singleton shared by every module. If another "
-                           + "module (e.g. chat) created the node, this call is disabled and the "
-                           + "preset/mode chosen there apply — the demo just uses that node."
-                    onCall: function(preset, mode, anonymity) { root.callCreateNode(preset, mode, anonymity) }
-                }
+                StackLayout {
+                    Layout.fillWidth: true
+                    currentIndex: advancedNodeConfig.checked ? 1 : 0
 
-                MethodCall {
-                    visible: advancedNodeConfig.checked
-                    methodName: "createNode"
-                    arg1Name: "config (JSON)"
-                    callEnabled: root.backend && !root.nodeReady
-                    infoTip: "<b>delivery_module.createNode(config)</b> + <b>start()</b><br><br>"
-                           + "The config logos-delivery actually receives, written out in "
-                           + "full.<br><br>"
-                           + "Full stack against a fleet:<br>"
-                           + "<code>{\"mode\":\"Core\",\"preset\":\"logos.test\"}</code><br><br>"
-                           + "Peered with a local node instead of a fleet — take the address "
-                           + "from that node's <b>Multiaddr</b> in the header:<br>"
-                           + "<code>{\"mode\":\"Core\",\"preset\":\"logos.test\","
-                           + "\"messagingOverrides\":{\"entry-node\":[\"/ip4/127.0.0.1/tcp/…\"]}}</code>"
-                           + "<br><br>"
-                           + "<code>messagingOverrides</code> takes the messaging layer's conf "
-                           + "keys by their serialized names — <code>entry-node</code>, "
-                           + "<code>cluster-id</code>, <code>tcp-port</code>, "
-                           + "<code>discv5-udp-port</code> — plus <code>anonymityLevel</code>."
-                    onCall: function(arg1, _arg2, _arg3) { root.callCreateNodeWithConfig(arg1) }
+                    CreateNodeCall {
+                        callEnabled: root.backend && !root.nodeReady
+                        infoTip: "<b>delivery_module.createNode(config)</b> + <b>start()</b><br><br>"
+                               + "Create and start the node against a chosen network.<br>"
+                               + "<b>preset</b> — <code>logos.dev</code> (Logos Dev Network) or "
+                               + "<code>logos.test</code> (Logos Test Network); both auto-configure "
+                               + "cluster id, entry nodes, sharding and RLN.<br>"
+                               + "<b>mode</b> — <code>Core</code> (full relay node) or "
+                               + "<code>Edge</code> (light/edge node).<br>"
+                               + "<b>anonymityLevel</b> — sender anonymity through mix: "
+                               + "<code>None</code> (send directly), <code>Preferred</code> or "
+                               + "<code>Required</code>; anything above <code>None</code> mounts mix "
+                               + "and sends over it.<br><br>"
+                               + "The node is no longer started automatically, so you can exercise "
+                               + "the module against different fleets and modes.<br><br>"
+                               + "Can be called once per Logos Core instance: <code>delivery_module</code> "
+                               + "and its node are a singleton shared by every module. If another "
+                               + "module (e.g. chat) created the node, this call is disabled and the "
+                               + "preset/mode chosen there apply — the demo just uses that node."
+                        onCall: function(preset, mode, anonymity) { root.callCreateNode(preset, mode, anonymity) }
+                    }
+
+                    MethodCall {
+                        methodName: "createNode"
+                        arg1Name: "config (JSON)"
+                        callEnabled: root.backend && !root.nodeReady
+                        infoTip: "<b>delivery_module.createNode(config)</b> + <b>start()</b><br><br>"
+                               + "The config logos-delivery actually receives, written out in "
+                               + "full.<br><br>"
+                               + "Full stack against a fleet:<br>"
+                               + "<code>{\"mode\":\"Core\",\"preset\":\"logos.test\"}</code><br><br>"
+                               + "Peered with a local node instead of a fleet — take the address "
+                               + "from that node's <b>Multiaddr</b> in the header:<br>"
+                               + "<code>{\"mode\":\"Core\",\"preset\":\"logos.test\","
+                               + "\"messagingOverrides\":{\"entry-node\":[\"/ip4/127.0.0.1/tcp/…\"]}}</code>"
+                               + "<br><br>"
+                               + "<code>messagingOverrides</code> takes the messaging layer's conf "
+                               + "keys by their serialized names — <code>entry-node</code>, "
+                               + "<code>cluster-id</code>, <code>tcp-port</code>, "
+                               + "<code>discv5-udp-port</code> — plus <code>anonymityLevel</code>."
+                        onCall: function(arg1, _arg2, _arg3) { root.callCreateNodeWithConfig(arg1) }
+                    }
                 }
             }
 
@@ -1285,7 +1288,7 @@ Item {
         readonly property bool hasArg3: arg3Name.length > 0
 
         Layout.fillWidth: true
-        Layout.preferredHeight: row.implicitHeight
+        implicitHeight: row.implicitHeight
         color: "transparent"
 
         function invoke() {
@@ -1301,6 +1304,7 @@ Item {
             spacing: Theme.spacing.tiny
 
             LogosText {
+                Layout.alignment: Qt.AlignVCenter
                 text: mc.methodName
                 font.family: root.monoFont
                 font.pixelSize: Theme.typography.primaryText
@@ -1308,6 +1312,7 @@ Item {
                 color: Theme.palette.primary
             }
             LogosText {
+                Layout.alignment: Qt.AlignVCenter
                 text: "("
                 font.family: root.monoFont
                 font.pixelSize: Theme.typography.primaryText
@@ -1316,6 +1321,7 @@ Item {
             // No Layout.minimumWidth: per-field floors add up past the group's
             // width and the row overflows instead of shrinking.
             DemoTextField {
+                Layout.alignment: Qt.AlignVCenter
                 id: arg1Field
                 placeholderText: mc.arg1Name
                 text: mc.arg1Default
@@ -1326,6 +1332,7 @@ Item {
                 function onAccepted() { mc.invoke() }
             }
             LogosText {
+                Layout.alignment: Qt.AlignVCenter
                 visible: mc.hasArg2
                 text: ","
                 font.family: root.monoFont
@@ -1333,6 +1340,7 @@ Item {
                 color: Theme.palette.textSecondary
             }
             DemoTextField {
+                Layout.alignment: Qt.AlignVCenter
                 id: arg2Field
                 visible: mc.hasArg2
                 placeholderText: mc.arg2Name
@@ -1345,6 +1353,7 @@ Item {
                 function onAccepted() { mc.invoke() }
             }
             LogosText {
+                Layout.alignment: Qt.AlignVCenter
                 visible: mc.hasArg3
                 text: ","
                 font.family: root.monoFont
@@ -1352,6 +1361,7 @@ Item {
                 color: Theme.palette.textSecondary
             }
             DemoTextField {
+                Layout.alignment: Qt.AlignVCenter
                 id: arg3Field
                 visible: mc.hasArg3
                 placeholderText: mc.arg3Name
@@ -1364,12 +1374,14 @@ Item {
                 function onAccepted() { mc.invoke() }
             }
             LogosText {
+                Layout.alignment: Qt.AlignVCenter
                 text: ")"
                 font.family: root.monoFont
                 font.pixelSize: Theme.typography.primaryText
                 color: Theme.palette.textSecondary
             }
             DemoButton {
+                Layout.alignment: Qt.AlignVCenter
                 text: "Call"
                 Layout.preferredWidth: 72
                 Layout.preferredHeight: 40
@@ -1381,7 +1393,7 @@ Item {
                          && (!mc.hasArg3 || arg3Field.text.length > 0)
                 onClicked: mc.invoke()
             }
-            InfoChip { tip: mc.infoTip }
+            InfoChip { tip: mc.infoTip; Layout.alignment: Qt.AlignVCenter }
         }
     }
 
@@ -1426,7 +1438,7 @@ Item {
         signal call(string preset, string mode, string anonymity)
 
         Layout.fillWidth: true
-        Layout.preferredHeight: cnRow.implicitHeight
+        implicitHeight: cnRow.implicitHeight
         color: "transparent"
 
         RowLayout {
