@@ -21,7 +21,7 @@ Pinned to `logos-delivery-module` [**`v0.2.0`**](https://github.com/logos-co/log
 - Surfacing `connectionStateChanged` as a live status badge
 - The **Reliable Channels API**: `channelCreate(channelId, contentTopic, senderId)` / `channelExists` / `channelSend` / `channelClose`, with the `channelMessageReceived` / `channelMessageSent` / `channelMessageError` events surfaced in the event log
 - A **global event log** that renders every observed event verbatim — `messageReceived`, `messageSent`, `messagePropagated`, `messageError`, `channelMessageReceived`, `channelMessageSent`, `channelMessageError`, plus the local return values of every playground call — colour-coded by event kind, with every field selectable so you can copy hashes, topics, payloads, request ids
-- A **method-call playground** at the bottom: one card per public `delivery_module` API call, rendered as `methodName(arg…)` with a `Call` button — every interaction is reflected as a row in the event log above. It follows the node's two phases: while there is no node it shows only **Configuration** (`configureRln`, then `createNode`), and once the node is up it swaps that panel for the API panels — **Messaging** (`subscribe`, `unsubscribe`, `send`) and **Reliable Channels** (`channelCreate`, `channelExists`, `channelSend`, `channelClose`) side by side. Once `configureRln` has run, an **RLN** panel sits between them and stays across both phases, showing the membership state and the epoch budget live. `createNode`'s three arguments are fixed-choice enums picked from dropdowns, unless **Advanced config** in the header swaps them for the raw config; message payloads are raw **bytes**: a global **Payload format** dropdown in the header switches between **HEX** and **UTF-8** for both payload entry and how payloads render in the event log (switching re-renders payloads already logged)
+- A **method-call playground** at the bottom: one card per public `delivery_module` API call, rendered as `methodName(arg…)` with a `Call` button — every interaction is reflected as a row in the event log above. It follows the node's two phases: while there is no node it shows the **RLN** and **Configuration** panels, and once the node is up it swaps Configuration for the API panels — **Messaging** (`subscribe`, `unsubscribe`, `send`) and **Reliable Channels** (`channelCreate`, `channelExists`, `channelSend`, `channelClose`) side by side. The **RLN** panel sits above them across both phases: it carries `configureRln` until that call lands, then shows the membership state and epoch budget live. `createNode`'s three arguments are fixed-choice enums picked from dropdowns, unless **Advanced config** in the Configuration panel's title bar swaps them for the raw config; message payloads are raw **bytes**: a global **Payload format** dropdown in the header switches between **HEX** and **UTF-8** for both payload entry and how payloads render in the event log (switching re-renders payloads already logged)
 - An info `?` chip next to every interactive element with a tooltip spelling out the exact `delivery_module` call behind it — the demo doubles as live API documentation
 - Using **[`Logos.Theme`](https://github.com/logos-co/logos-design-system) and `Logos.Controls`** for tokens, colors, and themed components — no hard-coded styling in the demo
 
@@ -71,7 +71,7 @@ The node is **not** started automatically. On start-up the playground shows only
 
 ### RLN
 
-To bring the node up with RLN on, call `configureRln` **before** `createNode` — the row above it in the Configuration panel. All three arguments come prefilled with this demo's defaults:
+To bring the node up with RLN on, call `configureRln` **before** `createNode` — the row in the **RLN** panel, above Configuration, so the panels read in call order. All three arguments come prefilled with this demo's defaults:
 
 | argument | default | what it is |
 | --- | --- | --- |
@@ -83,7 +83,7 @@ RLN never rides the `createNode` config: the delivery library asks an external R
 
 #### The RLN panel
 
-Once `configureRln` succeeds an **RLN** panel appears and stays for the rest of the session, live on both sides of `createNode`. It reads `liblogos_rln_module` directly — the demo declares it as a dependency of its own, alongside `delivery_module`, so it gets a generated client for it:
+Once `configureRln` succeeds the method gives way to the live figures, which stay for the rest of the session, on both sides of `createNode`. The panel reads `liblogos_rln_module` directly — the demo declares it as a dependency of its own, alongside `delivery_module`, so it gets a generated client for it:
 
 - **Membership** — `get_membership_state(registryId, rlnIdentifier)`, re-read every 10 s and immediately on the module's `membership_state_changed` push. `active` and `grace_period` can generate proofs; `pending` is a submitted registration still confirming; `unknown` means nothing resolves for the scope and `createNode` will fail at start.
 - **Messages left this epoch** — `get_epoch_quota(registryId, rlnIdentifier, timestamp)`, polled every 2 s and again on every proof the node generates. This is the budget still unspent over the membership's rate limit. The read is purely local and advisory: `generate_proof` remains the allocation authority, so a send can still fail `budget_exhausted` if the budget went between the read and the proof. A rate limit of `0` always means no usable membership rather than an exhausted budget.
@@ -92,7 +92,7 @@ Once `configureRln` succeeds an **RLN** panel appears and stays for the rest of 
 
 ### Talking to a local node instead of a fleet
 
-Both presets bootstrap off Status-hosted entry nodes. To peer two nodes directly — two demo instances on one machine, or a node you are running yourself — turn on **Advanced config** in the header and give `createNode` the config yourself:
+Both presets bootstrap off Status-hosted entry nodes. To peer two nodes directly — two demo instances on one machine, or a node you are running yourself — turn on **Advanced config** in the Configuration panel's title bar and give `createNode` the config yourself:
 
 ```json
 {
