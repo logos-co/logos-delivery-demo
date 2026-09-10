@@ -15,8 +15,9 @@ Pinned to `logos-delivery-module` [**`v0.2.0`**](https://github.com/logos-co/log
 - Declaring `delivery_module` as a Logos module dependency (in `metadata.json` and `flake.nix`)
 - Constructing the typed `LogosModules` wrapper from `LogosAPI*` in `initLogos`
 - Bootstrapping the node from the UI with `createNode(...)` and `start()`, with `LogosResult` checks — the fleet (`logos.test` / `logos.dev`, defaulting to `logos.test`), node mode (`Core` / `Edge`) and sender anonymity level (`None` / `Preferred` / `Required`) are picked from dropdowns
+- An **advanced** toggle that swaps those dropdowns for the raw `createNode` config, so the parts the dropdowns don't reach are still reachable — `entry-node` to peer with a local node instead of a fleet, `cluster-id`, ports, or a lower `entryLayer`. The config passes through to logos-delivery verbatim; the demo only checks it is well-formed JSON
 - Turning RLN on for that node with `configureRln(registryId, rlnIdentifier, epochSizeSec)` — a `delivery_module` method of its own, called *before* `createNode`, because the delivery library's RLN plugin names no registry and carries no config
-- Polling `delivery_module.getNodeInfo("MyPeerId")` for my peer ID every 3s, and reading the `logos-delivery` library version once at startup (`getNodeInfo("Version")`)
+- Reading the node's fixed attributes through `getNodeInfo` — `MyPeerId`, `MyMultiaddresses` and the `logos-delivery` library `Version`. They are constant for the life of the node, so they are read once (when the view opens and on `nodeStarted`) rather than polled
 - Surfacing `connectionStateChanged` as a live status badge
 - The **Reliable Channels API**: `channelCreate(channelId, contentTopic, senderId)` / `channelExists` / `channelSend` / `channelClose`, with the `channelMessageReceived` / `channelMessageSent` / `channelMessageError` events surfaced in the event log
 - A **global event log** that renders every observed event verbatim — `messageReceived`, `messageSent`, `messagePropagated`, `messageError`, `channelMessageReceived`, `channelMessageSent`, `channelMessageError`, plus the local return values of every playground call — colour-coded by event kind, with every field selectable so you can copy hashes, topics, payloads, request ids
@@ -71,6 +72,20 @@ The node is **not** started automatically. On start-up the playground shows only
 ### RLN
 
 To bring the node up with RLN on, call `configureRln` **before** `createNode` — the row above it in the Configuration panel. It takes a **`registryId`** (CAIP-10 account id of the registry deployment, e.g. `logos:testnet:0`), an **`rlnIdentifier`** (per-application id, exactly 64 hex characters) and an optional **`epochSizeSec`**. RLN never rides the `createNode` config: the delivery library asks an external RLN module for every RLN operation and its plugin names no registry, so the module is the only place a membership is named — and installing that plugin is what makes the library mount RLN, which it reads at node creation. Without the call the node comes up with RLN off. The node's membership must already be active; registration happens out of band, through the RLN module, and `createNode` fails at start without one.
+
+### Talking to a local node instead of a fleet
+
+Both presets bootstrap off Status-hosted entry nodes. To peer two nodes directly — two demo instances on one machine, or a node you are running yourself — turn on **Advanced** in the Configuration panel and give `createNode` the config yourself:
+
+```json
+{
+  "mode": "Core",
+  "preset": "logos.test",
+  "messagingOverrides": { "entry-node": ["/ip4/127.0.0.1/tcp/60000/p2p/16Uiu2..."] }
+}
+```
+
+Take that address from the other node's **Multiaddr** in the header. `preset` still supplies the cluster id and sharding; `entry-node` replaces only who it dials to bootstrap. `messagingOverrides` keys are the messaging conf's serialized names (`entry-node`, `cluster-id`, `tcp-port`, `discv5-udp-port`), plus `anonymityLevel`.
 
 ### Sharing the node with other modules
 

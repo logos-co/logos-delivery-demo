@@ -30,6 +30,7 @@ Item {
     readonly property string nodeStatus:    backend ? backend.connectionStatus : "no backend"
     readonly property bool   nodeReady:     backend ? backend.nodeReady       : false
     readonly property string peerIdValue:   backend ? backend.peerId          : ""
+    readonly property string multiaddrsValue: backend ? backend.multiaddrs   : ""
     readonly property string lastErrorValue: backend ? backend.lastError      : ""
     readonly property string deliveryVersionValue: backend ? backend.deliveryVersion : ""
 
@@ -242,6 +243,21 @@ Item {
                     eventName: "createNode() returned",
                     direction: "local",
                     config: preset + " / " + mode + " / " + anonymity,
+                    errorText: errStr || ""
+                })
+            },
+            function(_e) {}
+        )
+    }
+
+    function callCreateNodeWithConfig(configJson) {
+        if (!configJson) return
+        logos.watch(backend.createNodeWithConfig(configJson),
+            function(errStr) {
+                root.logEvent({
+                    eventName: "createNode() returned",
+                    direction: "local",
+                    config: configJson,
                     errorText: errStr || ""
                 })
             },
@@ -507,6 +523,37 @@ Item {
                     }
                 }
 
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.spacing.small
+
+                    LogosText {
+                        text: "Multiaddr:"
+                        font.pixelSize: Theme.typography.secondaryText
+                        color: Theme.palette.textSecondary
+                    }
+                    SelectableValue {
+                        text: root.multiaddrsValue.length > 0
+                              ? root.multiaddrsValue
+                              : "(not available yet)"
+                        font.family: root.monoFont
+                        wrapMode: TextEdit.NoWrap
+                        clip: true
+                        Layout.fillWidth: true
+                        Layout.maximumWidth: implicitWidth
+                    }
+                    InfoChip {
+                        tip: "<b>Multiaddr</b> — every address this node listens on, as the "
+                           + "verbatim <code>getNodeInfo(\"MyMultiaddresses\")</code> string.<br><br>"
+                           + "Read once per node, alongside the peer id.<br><br>"
+                           + "Paste one into another node's <code>entry-node</code> config to "
+                           + "peer two local nodes directly instead of bootstrapping off a "
+                           + "fleet — see the advanced <code>createNode</code> config."
+                    }
+
+                    Item { Layout.fillWidth: true }
+                }
+
                 Rectangle {
                     visible: root.lastErrorValue.length > 0
                     Layout.fillWidth: true
@@ -646,7 +693,34 @@ Item {
                     onCall: function(arg1, arg2, arg3) { root.callConfigureRln(arg1, arg2, arg3) }
                 }
 
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.spacing.small
+
+                    LogosSwitch {
+                        id: advancedNodeConfig
+                        text: "Advanced: write the node config as JSON"
+                        font.pixelSize: Theme.typography.secondaryText
+                    }
+                    InfoChip {
+                        tip: "<b>Advanced node config</b> — swaps the three dropdowns for the "
+                           + "raw <code>createNode</code> config.<br><br>"
+                           + "The dropdowns only reach <code>preset</code>, <code>mode</code> "
+                           + "and <code>anonymityLevel</code>. The config itself passes through "
+                           + "to logos-delivery verbatim, which owns the grammar — so writing it "
+                           + "directly reaches everything else: <code>entry-node</code> to peer "
+                           + "with a local node instead of a fleet, <code>cluster-id</code>, "
+                           + "ports, or an <code>entryLayer</code> below the default "
+                           + "<code>channels</code>.<br><br>"
+                           + "Checked for well-formed JSON here; every other error comes back "
+                           + "from logos-delivery."
+                    }
+
+                    Item { Layout.fillWidth: true }
+                }
+
                 CreateNodeCall {
+                    visible: !advancedNodeConfig.checked
                     callEnabled: root.backend && !root.nodeReady
                     infoTip: "<b>delivery_module.createNode(config)</b> + <b>start()</b><br><br>"
                            + "Create and start the node against a chosen network.<br>"
@@ -666,6 +740,28 @@ Item {
                            + "module (e.g. chat) created the node, this call is disabled and the "
                            + "preset/mode chosen there apply — the demo just uses that node."
                     onCall: function(preset, mode, anonymity) { root.callCreateNode(preset, mode, anonymity) }
+                }
+
+                MethodCall {
+                    visible: advancedNodeConfig.checked
+                    methodName: "createNode"
+                    arg1Name: "config (JSON)"
+                    callEnabled: root.backend && !root.nodeReady
+                    infoTip: "<b>delivery_module.createNode(config)</b> + <b>start()</b><br><br>"
+                           + "The config logos-delivery actually receives, written out in "
+                           + "full.<br><br>"
+                           + "Full stack against a fleet:<br>"
+                           + "<code>{\"mode\":\"Core\",\"preset\":\"logos.test\"}</code><br><br>"
+                           + "Peered with a local node instead of a fleet — take the address "
+                           + "from that node's <b>Multiaddr</b> in the header:<br>"
+                           + "<code>{\"mode\":\"Core\",\"preset\":\"logos.test\","
+                           + "\"messagingOverrides\":{\"entry-node\":[\"/ip4/127.0.0.1/tcp/…\"]}}</code>"
+                           + "<br><br>"
+                           + "<code>messagingOverrides</code> takes the messaging layer's conf "
+                           + "keys by their serialized names — <code>entry-node</code>, "
+                           + "<code>cluster-id</code>, <code>tcp-port</code>, "
+                           + "<code>discv5-udp-port</code> — plus <code>anonymityLevel</code>."
+                    onCall: function(arg1, _arg2, _arg3) { root.callCreateNodeWithConfig(arg1) }
                 }
             }
 

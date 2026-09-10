@@ -4,6 +4,7 @@ class LogosDeliveryDemo
     PROP(bool nodeReady=false READONLY)
     PROP(QString lastError="" READONLY)
     PROP(QString peerId="" READONLY)
+    PROP(QString multiaddrs="" READONLY)
     PROP(QString deliveryVersion="" READONLY)
 
     SIGNAL(messageReceived(QString topic, QString payload, QString messageHash, qint64 timestamp))
@@ -19,6 +20,7 @@ class LogosDeliveryDemo
 
     SLOT(QString configureRln(QString registryId, QString rlnIdentifier, QString epochSizeSec))
     SLOT(QString createNode(QString preset, QString mode, QString anonymityLevel))
+    SLOT(QString createNodeWithConfig(QString configJson))
     SLOT(QString subscribe(QString topic))
     SLOT(QString unsubscribe(QString topic))
     SLOT(QString sendMessage(QString topic, QString payloadHex))

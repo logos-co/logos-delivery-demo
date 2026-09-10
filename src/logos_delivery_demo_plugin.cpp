@@ -6,6 +6,7 @@
 #include <QDebug>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonParseError>
 
 LogosDeliveryDemoPlugin::LogosDeliveryDemoPlugin(QObject* parent)
     : LogosDeliveryDemoSimpleSource(parent)
@@ -156,9 +157,6 @@ QString LogosDeliveryDemoPlugin::configureRln(QString registryId, QString rlnIde
 
 QString LogosDeliveryDemoPlugin::createNode(QString preset, QString mode, QString anonymityLevel)
 {
-    if (!m_logos) return QStringLiteral("Backend not initialised");
-    if (nodeReady()) return QStringLiteral("Node already created");
-
     // No port config: the layered shape gets ephemeral p2p ports (logos-delivery
     // defaults them to 0), so two demo instances on one machine don't collide.
     // Keep bare kernel fields (logLevel, entry-layer, ports) out of the top
@@ -173,7 +171,36 @@ QString LogosDeliveryDemoPlugin::createNode(QString preset, QString mode, QStrin
             {"anonymityLevel", anonymityLevel},
         }},
     };
-    const QString cfgJson = QString::fromUtf8(QJsonDocument(cfg).toJson(QJsonDocument::Compact));
+
+    return startNode(QString::fromUtf8(QJsonDocument(cfg).toJson(QJsonDocument::Compact)));
+}
+
+QString LogosDeliveryDemoPlugin::createNodeWithConfig(QString configJson)
+{
+    const QString cfgJson = configJson.trimmed();
+    if (cfgJson.isEmpty()) return QStringLiteral("Config is empty");
+
+    // Rejected here rather than at the FFI boundary, where a malformed config
+    // surfaces as a parse error with no position.
+    QJsonParseError parseError{};
+    const QJsonDocument parsed = QJsonDocument::fromJson(cfgJson.toUtf8(), &parseError);
+    if (parseError.error != QJsonParseError::NoError) {
+        return QStringLiteral("Config is not valid JSON: %1 (at offset %2)")
+            .arg(parseError.errorString())
+            .arg(parseError.offset);
+    }
+    if (!parsed.isObject()) return QStringLiteral("Config must be a JSON object");
+
+    return startNode(cfgJson);
+}
+
+// Both entry points end here: logos-delivery owns the config grammar, so the
+// JSON crosses the FFI boundary verbatim either way.
+QString LogosDeliveryDemoPlugin::startNode(const QString& cfgJson)
+{
+    if (!m_logos) return QStringLiteral("Backend not initialised");
+    if (nodeReady()) return QStringLiteral("Node already created");
+
     qInfo() << "logos_delivery_demo: createNode" << cfgJson;
 
     LogosResult create = m_logos->delivery_module.createNode(cfgJson);
@@ -195,11 +222,12 @@ QString LogosDeliveryDemoPlugin::createNode(QString preset, QString mode, QStrin
     return QString();
 }
 
-// Read the node's fixed attributes. Both are constant for the life of the node
-// — the peer id derives from the node key at construction, the version is a
-// build-time constant of liblogosdelivery — so they are read once per node
-// rather than polled: at init (the node may already exist, created by another
-// module) and on nodeStarted.
+// Read the node's fixed attributes. All three are constant for the life of the
+// node — the peer id derives from the node key at construction, the listening
+// multiaddresses are fixed once it binds, the version is a build-time constant
+// of liblogosdelivery — so they are read once per node rather than polled: at
+// init (the node may already exist, created by another module) and on
+// nodeStarted.
 void LogosDeliveryDemoPlugin::readNodeInfo()
 {
     if (!m_logos) return;
@@ -212,6 +240,12 @@ void LogosDeliveryDemoPlugin::readNodeInfo()
         return;
     }
     setPeerId(peer.getString());
+
+    // Feeding one of these to another node's entry-node peers them locally.
+    LogosResult addrs = m_logos->delivery_module.getNodeInfo(QStringLiteral("MyMultiaddresses"));
+    if (addrs.success) {
+        setMultiaddrs(addrs.getString());
+    }
 
     // logos-delivery (liblogosdelivery) version. Exposed as the "Version"
     // getNodeInfo attribute — the same call delivery_module's own version()
@@ -228,6 +262,7 @@ void LogosDeliveryDemoPlugin::clearNodeInfo()
 {
     setNodeReady(false);
     setPeerId(QString());
+    setMultiaddrs(QString());
     setDeliveryVersion(QString());
 }
 

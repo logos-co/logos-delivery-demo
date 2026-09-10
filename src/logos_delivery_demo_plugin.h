@@ -29,6 +29,7 @@ public:
 
     QString configureRln(QString registryId, QString rlnIdentifier, QString epochSizeSec) override;
     QString createNode(QString preset, QString mode, QString anonymityLevel) override;
+    QString createNodeWithConfig(QString configJson) override;
     QString subscribe(QString topic) override;
     QString unsubscribe(QString topic) override;
     QString sendMessage(QString topic, QString payloadHex) override;
@@ -42,6 +43,7 @@ signals:
 
 private:
     void wireEvents();
+    QString startNode(const QString& cfgJson);
     void readNodeInfo();
     void clearNodeInfo();
 
