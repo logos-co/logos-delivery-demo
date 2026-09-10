@@ -619,27 +619,6 @@ Item {
                     }
 
                     Item { Layout.fillWidth: true }
-
-                    LogosSwitch {
-                        id: advancedNodeConfig
-                        visible: !root.nodeReady
-                        text: "Advanced config"
-                        font.pixelSize: Theme.typography.secondaryText
-                    }
-                    InfoChip {
-                        visible: !root.nodeReady
-                        tip: "<b>Advanced node config</b> — swaps <code>createNode</code>'s three "
-                           + "dropdowns for the raw config.<br><br>"
-                           + "The dropdowns only reach <code>preset</code>, <code>mode</code> "
-                           + "and <code>anonymityLevel</code>. The config itself passes through "
-                           + "to logos-delivery verbatim, which owns the grammar — so writing it "
-                           + "directly reaches everything else: <code>entry-node</code> to peer "
-                           + "with a local node instead of a fleet, <code>cluster-id</code>, "
-                           + "ports, or an <code>entryLayer</code> below the default "
-                           + "<code>channels</code>.<br><br>"
-                           + "Checked for well-formed JSON here; every other error comes back "
-                           + "from logos-delivery."
-                    }
                 }
 
                 Rectangle {
@@ -747,11 +726,11 @@ Item {
             spacing: Theme.spacing.small
 
             ApiGroup {
-                title: "Configuration"
-                visible: !root.nodeReady
+                title: "RLN"
                 Layout.fillWidth: true
 
                 MethodCall {
+                    visible: !root.rlnConfiguredValue
                     methodName: "configureRln"
                     arg1Name: "registryId"
                     arg2Name: "rlnIdentifier"
@@ -759,11 +738,16 @@ Item {
                     arg1Default: root.defaultRegistryId
                     arg2Default: root.defaultRlnIdentifier
                     arg3Default: root.defaultEpochSizeSec
+                    // Four digits is a long epoch; the row reads better
+                    // with the space given to the two hex arguments.
+                    arg3Width: 90
                     callEnabled: root.backend && !root.nodeReady
                     infoTip: "<b>delivery_module.configureRln(config)</b><br><br>"
                            + "Turn RLN on for the node this demo is about to create.<br>"
                            + "<b>registryId</b> — CAIP-10 account id of the registry "
-                           + "deployment, e.g. <code>logos:testnet:0</code>.<br>"
+                           + "deployment. In the <code>logos</code> namespace the account "
+                           + "is the registration program's config PDA and must be the "
+                           + "full 64 hex characters.<br>"
                            + "<b>rlnIdentifier</b> — per-application id, exactly 64 hex "
                            + "characters (32 bytes); every node of a deployment must use "
                            + "the same one.<br>"
@@ -788,61 +772,8 @@ Item {
                     onCall: function(arg1, arg2, arg3) { root.callConfigureRln(arg1, arg2, arg3) }
                 }
 
-                StackLayout {
-                    Layout.fillWidth: true
-                    currentIndex: advancedNodeConfig.checked ? 1 : 0
-
-                    CreateNodeCall {
-                        callEnabled: root.backend && !root.nodeReady
-                        infoTip: "<b>delivery_module.createNode(config)</b> + <b>start()</b><br><br>"
-                               + "Create and start the node against a chosen network.<br>"
-                               + "<b>preset</b> — <code>logos.dev</code> (Logos Dev Network) or "
-                               + "<code>logos.test</code> (Logos Test Network); both auto-configure "
-                               + "cluster id, entry nodes, sharding and RLN.<br>"
-                               + "<b>mode</b> — <code>Core</code> (full relay node) or "
-                               + "<code>Edge</code> (light/edge node).<br>"
-                               + "<b>anonymityLevel</b> — sender anonymity through mix: "
-                               + "<code>None</code> (send directly), <code>Preferred</code> or "
-                               + "<code>Required</code>; anything above <code>None</code> mounts mix "
-                               + "and sends over it.<br><br>"
-                               + "The node is no longer started automatically, so you can exercise "
-                               + "the module against different fleets and modes.<br><br>"
-                               + "Can be called once per Logos Core instance: <code>delivery_module</code> "
-                               + "and its node are a singleton shared by every module. If another "
-                               + "module (e.g. chat) created the node, this call is disabled and the "
-                               + "preset/mode chosen there apply — the demo just uses that node."
-                        onCall: function(preset, mode, anonymity) { root.callCreateNode(preset, mode, anonymity) }
-                    }
-
-                    MethodCall {
-                        methodName: "createNode"
-                        arg1Name: "config (JSON)"
-                        callEnabled: root.backend && !root.nodeReady
-                        infoTip: "<b>delivery_module.createNode(config)</b> + <b>start()</b><br><br>"
-                               + "The config logos-delivery actually receives, written out in "
-                               + "full.<br><br>"
-                               + "Full stack against a fleet:<br>"
-                               + "<code>{\"mode\":\"Core\",\"preset\":\"logos.test\"}</code><br><br>"
-                               + "Peered with a local node instead of a fleet — take the address "
-                               + "from that node's <b>Multiaddr</b> in the header:<br>"
-                               + "<code>{\"mode\":\"Core\",\"preset\":\"logos.test\","
-                               + "\"messagingOverrides\":{\"entry-node\":[\"/ip4/127.0.0.1/tcp/…\"]}}</code>"
-                               + "<br><br>"
-                               + "<code>messagingOverrides</code> takes the messaging layer's conf "
-                               + "keys by their serialized names — <code>entry-node</code>, "
-                               + "<code>cluster-id</code>, <code>tcp-port</code>, "
-                               + "<code>discv5-udp-port</code> — plus <code>anonymityLevel</code>."
-                        onCall: function(arg1, _arg2, _arg3) { root.callCreateNodeWithConfig(arg1) }
-                    }
-                }
-            }
-
-            ApiGroup {
-                title: "RLN"
-                visible: root.rlnConfiguredValue
-                Layout.fillWidth: true
-
                 GridLayout {
+                    visible: root.rlnConfiguredValue
                     Layout.fillWidth: true
                     columns: 4
                     columnSpacing: Theme.spacing.medium
@@ -926,7 +857,7 @@ Item {
                 }
 
                 RowLayout {
-                    visible: root.rlnStatusValue.length > 0
+                    visible: root.rlnConfiguredValue && root.rlnStatusValue.length > 0
                     Layout.fillWidth: true
                     spacing: Theme.spacing.small
 
@@ -940,7 +871,7 @@ Item {
                 }
 
                 RowLayout {
-                    visible: root.rlnMembershipHashValue.length > 0
+                    visible: root.rlnConfiguredValue && root.rlnMembershipHashValue.length > 0
                     Layout.fillWidth: true
                     spacing: Theme.spacing.small
 
@@ -960,6 +891,85 @@ Item {
                     Item { Layout.fillWidth: true }
                 }
             }
+
+            ApiGroup {
+                title: "Configuration"
+                visible: !root.nodeReady
+                Layout.fillWidth: true
+                headerRight: RowLayout {
+                    spacing: Theme.spacing.small
+                    LogosSwitch {
+                        id: advancedNodeConfig
+                        text: "Advanced config"
+                        font.pixelSize: Theme.typography.secondaryText
+                    }
+                    InfoChip {
+                        tip: "<b>Advanced node config</b> — swaps <code>createNode</code>'s three "
+                               + "dropdowns for the raw config.<br><br>"
+                               + "The dropdowns only reach <code>preset</code>, <code>mode</code> "
+                               + "and <code>anonymityLevel</code>. The config itself passes through "
+                               + "to logos-delivery verbatim, which owns the grammar — so writing it "
+                               + "directly reaches everything else: <code>entry-node</code> to peer "
+                               + "with a local node instead of a fleet, <code>cluster-id</code>, "
+                               + "ports, or an <code>entryLayer</code> below the default "
+                               + "<code>channels</code>.<br><br>"
+                               + "Checked for well-formed JSON here; every other error comes back "
+                               + "from logos-delivery."
+                    }
+                }
+
+
+
+                StackLayout {
+                    Layout.fillWidth: true
+                    currentIndex: advancedNodeConfig.checked ? 1 : 0
+
+                    CreateNodeCall {
+                        callEnabled: root.backend && !root.nodeReady
+                        infoTip: "<b>delivery_module.createNode(config)</b> + <b>start()</b><br><br>"
+                               + "Create and start the node against a chosen network.<br>"
+                               + "<b>preset</b> — <code>logos.dev</code> (Logos Dev Network) or "
+                               + "<code>logos.test</code> (Logos Test Network); both auto-configure "
+                               + "cluster id, entry nodes, sharding and RLN.<br>"
+                               + "<b>mode</b> — <code>Core</code> (full relay node) or "
+                               + "<code>Edge</code> (light/edge node).<br>"
+                               + "<b>anonymityLevel</b> — sender anonymity through mix: "
+                               + "<code>None</code> (send directly), <code>Preferred</code> or "
+                               + "<code>Required</code>; anything above <code>None</code> mounts mix "
+                               + "and sends over it.<br><br>"
+                               + "The node is no longer started automatically, so you can exercise "
+                               + "the module against different fleets and modes.<br><br>"
+                               + "Can be called once per Logos Core instance: <code>delivery_module</code> "
+                               + "and its node are a singleton shared by every module. If another "
+                               + "module (e.g. chat) created the node, this call is disabled and the "
+                               + "preset/mode chosen there apply — the demo just uses that node."
+                        onCall: function(preset, mode, anonymity) { root.callCreateNode(preset, mode, anonymity) }
+                    }
+
+                    MethodCall {
+                        methodName: "createNode"
+                        arg1Name: "config (JSON)"
+                        callEnabled: root.backend && !root.nodeReady
+                        infoTip: "<b>delivery_module.createNode(config)</b> + <b>start()</b><br><br>"
+                               + "The config logos-delivery actually receives, written out in "
+                               + "full.<br><br>"
+                               + "Full stack against a fleet:<br>"
+                               + "<code>{\"mode\":\"Core\",\"preset\":\"logos.test\"}</code><br><br>"
+                               + "Peered with a local node instead of a fleet — take the address "
+                               + "from that node's <b>Multiaddr</b> in the header:<br>"
+                               + "<code>{\"mode\":\"Core\",\"preset\":\"logos.test\","
+                               + "\"messagingOverrides\":{\"entry-node\":[\"/ip4/127.0.0.1/tcp/…\"]}}</code>"
+                               + "<br><br>"
+                               + "<code>messagingOverrides</code> takes the messaging layer's conf "
+                               + "keys by their serialized names — <code>entry-node</code>, "
+                               + "<code>cluster-id</code>, <code>tcp-port</code>, "
+                               + "<code>discv5-udp-port</code> — plus <code>anonymityLevel</code>."
+                        onCall: function(arg1, _arg2, _arg3) { root.callCreateNodeWithConfig(arg1) }
+                    }
+                }
+            }
+
+
 
             SplitView {
                 id: apiSplit
@@ -1206,6 +1216,7 @@ Item {
         property string title: ""
         property string tag: ""
         default property alias content: groupCol.data
+        property alias headerRight: headerExtra.data
 
         implicitHeight: grpCol.implicitHeight + Theme.spacing.medium * 2
         color: Theme.palette.backgroundSecondary
@@ -1253,6 +1264,11 @@ Item {
                 }
 
                 Item { Layout.fillWidth: true }
+
+                RowLayout {
+                    id: headerExtra
+                    spacing: Theme.spacing.small
+                }
             }
 
             ColumnLayout {
@@ -1279,6 +1295,8 @@ Item {
         property string arg1Default: ""
         property string arg2Default: ""
         property string arg3Default: ""
+        // 0 fills the row like the other fields; set it for a short value.
+        property int    arg3Width: 0
         property string infoTip: ""
         property bool   callEnabled: true
 
@@ -1366,7 +1384,8 @@ Item {
                 visible: mc.hasArg3
                 placeholderText: mc.arg3Name
                 text: mc.arg3Default
-                Layout.fillWidth: mc.hasArg3
+                Layout.fillWidth: mc.hasArg3 && mc.arg3Width <= 0
+                Layout.preferredWidth: mc.arg3Width > 0 ? mc.arg3Width : implicitWidth
             }
             Connections {
                 target: arg3Field.textInput
