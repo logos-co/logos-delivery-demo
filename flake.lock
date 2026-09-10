@@ -791,7 +791,7 @@
       },
       "original": {
         "owner": "logos-co",
-        "ref": "chore/bump-rln-module-dep-chain",
+        "ref": "impl-plugable-rln-api-module",
         "repo": "logos-delivery-module",
         "type": "github"
       }
