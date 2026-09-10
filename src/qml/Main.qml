@@ -562,27 +562,6 @@ Item {
 
                     Item { Layout.fillWidth: true }
 
-                    LogosSwitch {
-                        id: advancedNodeConfig
-                        visible: !root.nodeReady
-                        text: "Advanced config"
-                        font.pixelSize: Theme.typography.secondaryText
-                    }
-                    InfoChip {
-                        visible: !root.nodeReady
-                        tip: "<b>Advanced node config</b> — swaps <code>createNode</code>'s three "
-                           + "dropdowns for the raw config.<br><br>"
-                           + "The dropdowns only reach <code>preset</code>, <code>mode</code> "
-                           + "and <code>anonymityLevel</code>. The config itself passes through "
-                           + "to logos-delivery verbatim, which owns the grammar — so writing it "
-                           + "directly reaches everything else: <code>entry-node</code> to peer "
-                           + "with a local node instead of a fleet, <code>cluster-id</code>, "
-                           + "ports, or an <code>entryLayer</code> below the default "
-                           + "<code>channels</code>.<br><br>"
-                           + "Checked for well-formed JSON here; every other error comes back "
-                           + "from logos-delivery."
-                    }
-
                     LogosText {
                         text: "Payload format:"
                         font.pixelSize: Theme.typography.secondaryText
@@ -640,6 +619,27 @@ Item {
                     }
 
                     Item { Layout.fillWidth: true }
+
+                    LogosSwitch {
+                        id: advancedNodeConfig
+                        visible: !root.nodeReady
+                        text: "Advanced config"
+                        font.pixelSize: Theme.typography.secondaryText
+                    }
+                    InfoChip {
+                        visible: !root.nodeReady
+                        tip: "<b>Advanced node config</b> — swaps <code>createNode</code>'s three "
+                           + "dropdowns for the raw config.<br><br>"
+                           + "The dropdowns only reach <code>preset</code>, <code>mode</code> "
+                           + "and <code>anonymityLevel</code>. The config itself passes through "
+                           + "to logos-delivery verbatim, which owns the grammar — so writing it "
+                           + "directly reaches everything else: <code>entry-node</code> to peer "
+                           + "with a local node instead of a fleet, <code>cluster-id</code>, "
+                           + "ports, or an <code>entryLayer</code> below the default "
+                           + "<code>channels</code>.<br><br>"
+                           + "Checked for well-formed JSON here; every other error comes back "
+                           + "from logos-delivery."
+                    }
                 }
 
                 Rectangle {
