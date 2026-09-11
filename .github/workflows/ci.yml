@@ -1,6 +1,6 @@
 name: CI
 
-# Builds the demo module from the flake on both supported platforms:
+# Builds the demo module from the flake on every supported platform:
 # `.#default` is the plugin, `.#lgx` the installable package. Nix inputs and
 # build outputs come from / go to the Logos Attic cache — pushes to main
 # publish to the `public` cache, every other ref to `ci` (fork PRs get no
@@ -28,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest]
 
     runs-on: ${{ matrix.os }}
     # A warm cache builds this in ~2 min; the headroom is for a cache miss on
