@@ -3,9 +3,12 @@
 #include "logos_sdk.h"
 #include "logos_types.h"
 
+#include <QDateTime>
 #include <QDebug>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonParseError>
+#include <QMetaObject>
 
 LogosDeliveryDemoPlugin::LogosDeliveryDemoPlugin(QObject* parent)
     : LogosDeliveryDemoSimpleSource(parent)
@@ -119,13 +122,162 @@ void LogosDeliveryDemoPlugin::wireEvents()
         if (data.size() < 4) return;
         emit channelMessageErrorNotif(data.at(0).toString(), data.at(1).toString(), data.at(2).toString(), data.at(3).toLongLong());
     });
+
+    // The delivery library asks for one proof per outbound message and one
+    // validation per inbound one, so these are the node's live RLN traffic.
+    // They keep firing even though the in-process bridge answers them.
+    m_logos->delivery_module.on("dispatchRlnGenerateProofRequestEvent", [this](const QVariantList& data) {
+        if (data.size() < 6) return;
+        setRlnProofs(rlnProofs() + 1);
+        emit rlnProofRequested(data.at(3).toString(), data.at(4).toLongLong(), data.at(5).toLongLong());
+        pollRlnQuota();
+    });
+    m_logos->delivery_module.on("dispatchRlnValidateProofRequestEvent", [this](const QVariantList& data) {
+        if (data.size() < 7) return;
+        setRlnValidations(rlnValidations() + 1);
+        emit rlnValidationRequested(data.at(3).toString(), data.at(4).toLongLong(), data.at(6).toLongLong());
+    });
+
+    // A push from the RLN module's confirmation poller. get_membership_state
+    // stays the authority, so this only wakes an immediate re-read.
+    m_logos->liblogos_rln_module.onMembership_state_changed(
+        [this](const QString& registryId, const QString& rlnIdentifier,
+               const QString& membershipHash, const QString& state, const QString& previous) {
+            if (registryId != m_rlnRegistryId) return;
+            Q_UNUSED(rlnIdentifier);
+            QMetaObject::invokeMethod(this, [this, membershipHash, state, previous]() {
+                emit rlnMembershipTransition(membershipHash, state, previous);
+                pollRlnMembership();
+            }, Qt::QueuedConnection);
+        });
 }
 
-QString LogosDeliveryDemoPlugin::createNode(QString preset, QString mode, QString anonymityLevel)
+// liblogos_rln_module answers `result` methods with the value as a QVariantMap
+// and `tstr` methods with a JSON string, so both shapes reach this.
+static QJsonObject rlnObject(const QVariant& value)
+{
+    if (value.canConvert<QVariantMap>() && value.typeId() != QMetaType::QString) {
+        return QJsonObject::fromVariantMap(value.toMap());
+    }
+    return QJsonDocument::fromJson(value.toString().toUtf8()).object();
+}
+
+// The module reports a failed `tstr` call in band, as {"error":{…}}.
+static QString rlnInBandError(const QJsonObject& obj)
+{
+    const QJsonObject err = obj.value(QStringLiteral("error")).toObject();
+    if (err.isEmpty()) return QString();
+    return QStringLiteral("%1: %2")
+        .arg(err.value(QStringLiteral("kind")).toString(),
+             err.value(QStringLiteral("message")).toString());
+}
+
+void LogosDeliveryDemoPlugin::startRlnPolling()
+{
+    if (m_rlnQuotaTimer) return;
+
+    // The quota is a local read, so it can be cheap and frequent; the
+    // membership state costs a registry read, and matches the 10s the RLN
+    // membership UI polls at.
+    m_rlnQuotaTimer = new QTimer(this);
+    m_rlnQuotaTimer->setInterval(2000);
+    connect(m_rlnQuotaTimer, &QTimer::timeout, this, &LogosDeliveryDemoPlugin::pollRlnQuota);
+    m_rlnQuotaTimer->start();
+
+    m_rlnMembershipTimer = new QTimer(this);
+    m_rlnMembershipTimer->setInterval(10000);
+    connect(m_rlnMembershipTimer, &QTimer::timeout, this, &LogosDeliveryDemoPlugin::pollRlnMembership);
+    m_rlnMembershipTimer->start();
+
+    pollRlnQuota();
+    pollRlnMembership();
+}
+
+void LogosDeliveryDemoPlugin::pollRlnQuota()
+{
+    if (!m_logos || m_rlnRegistryId.isEmpty()) return;
+
+    // The same clock reading a send would stamp on its message: the epoch is
+    // derived from the timestamp, not from the module's own clock.
+    const QString now = QString::number(QDateTime::currentSecsSinceEpoch());
+    m_logos->liblogos_rln_module.get_epoch_quotaAsync(
+        m_rlnRegistryId, m_rlnIdentifier, now, [this](LogosResult result) {
+            QMetaObject::invokeMethod(this, [this, result]() {
+                if (!result.success) {
+                    setRlnStatus(result.getError());
+                    setRlnRemaining(-1);
+                    return;
+                }
+                const QJsonObject obj = rlnObject(result.value);
+                setRlnEpochIndex(QString::number(
+                    static_cast<qint64>(obj.value(QStringLiteral("epoch_index")).toDouble())));
+                setRlnRateLimit(obj.value(QStringLiteral("rate_limit")).toInt());
+                setRlnRemaining(obj.value(QStringLiteral("remaining")).toInt());
+                setRlnStatus(QString());
+            }, Qt::QueuedConnection);
+        });
+}
+
+void LogosDeliveryDemoPlugin::pollRlnMembership()
+{
+    if (!m_logos || m_rlnRegistryId.isEmpty()) return;
+
+    m_logos->liblogos_rln_module.get_membership_stateAsync(
+        m_rlnRegistryId, m_rlnIdentifier, [this](QString reply) {
+            QMetaObject::invokeMethod(this, [this, reply]() {
+                const QJsonObject obj = QJsonDocument::fromJson(reply.toUtf8()).object();
+                const QString err = rlnInBandError(obj);
+                if (!err.isEmpty()) {
+                    setRlnStatus(err);
+                    setRlnMembershipState(QStringLiteral("unknown"));
+                    return;
+                }
+                setRlnMembershipState(obj.value(QStringLiteral("state")).toString());
+                setRlnMembershipHash(obj.value(QStringLiteral("membership_hash")).toString());
+            }, Qt::QueuedConnection);
+        });
+}
+
+QString LogosDeliveryDemoPlugin::configureRln(QString registryId, QString rlnIdentifier,
+                                             QString epochSizeSec)
 {
     if (!m_logos) return QStringLiteral("Backend not initialised");
     if (nodeReady()) return QStringLiteral("Node already created");
 
+    QJsonObject cfg{
+        {"registry-id", registryId.trimmed()},
+        {"rln-identifier", rlnIdentifier.trimmed()},
+    };
+
+    // Not optional: liblogos_rln_module.start() refuses a config without it,
+    // and delivery_module only forwards the key when it is set.
+    bool epochOk = false;
+    const qint64 epoch = epochSizeSec.trimmed().toLongLong(&epochOk);
+    if (!epochOk || epoch <= 0) return QStringLiteral("epochSizeSec must be a positive integer");
+    cfg.insert(QStringLiteral("epoch-size-sec"), epoch);
+
+    const QString cfgJson = QString::fromUtf8(QJsonDocument(cfg).toJson(QJsonDocument::Compact));
+    qInfo() << "logos_delivery_demo: configureRln" << cfgJson;
+
+    LogosResult configured = m_logos->delivery_module.configureRln(cfgJson);
+    if (!configured.success) {
+        setLastError(QStringLiteral("configureRln failed: %1").arg(configured.getError()));
+        return configured.getError();
+    }
+
+    qInfo() << "logos_delivery_demo: configureRln succeeded";
+
+    m_rlnRegistryId = registryId.trimmed();
+    m_rlnIdentifier = rlnIdentifier.trimmed();
+    setRlnEpochSizeSec(static_cast<int>(epoch));
+    setRlnConfigured(true);
+    startRlnPolling();
+
+    return QString();
+}
+
+QString LogosDeliveryDemoPlugin::createNode(QString preset, QString mode, QString anonymityLevel)
+{
     // No port config: the layered shape gets ephemeral p2p ports (logos-delivery
     // defaults them to 0), so two demo instances on one machine don't collide.
     // Keep bare kernel fields (logLevel, entry-layer, ports) out of the top
@@ -140,7 +292,36 @@ QString LogosDeliveryDemoPlugin::createNode(QString preset, QString mode, QStrin
             {"anonymityLevel", anonymityLevel},
         }},
     };
-    const QString cfgJson = QString::fromUtf8(QJsonDocument(cfg).toJson(QJsonDocument::Compact));
+
+    return startNode(QString::fromUtf8(QJsonDocument(cfg).toJson(QJsonDocument::Compact)));
+}
+
+QString LogosDeliveryDemoPlugin::createNodeWithConfig(QString configJson)
+{
+    const QString cfgJson = configJson.trimmed();
+    if (cfgJson.isEmpty()) return QStringLiteral("Config is empty");
+
+    // Rejected here rather than at the FFI boundary, where a malformed config
+    // surfaces as a parse error with no position.
+    QJsonParseError parseError{};
+    const QJsonDocument parsed = QJsonDocument::fromJson(cfgJson.toUtf8(), &parseError);
+    if (parseError.error != QJsonParseError::NoError) {
+        return QStringLiteral("Config is not valid JSON: %1 (at offset %2)")
+            .arg(parseError.errorString())
+            .arg(parseError.offset);
+    }
+    if (!parsed.isObject()) return QStringLiteral("Config must be a JSON object");
+
+    return startNode(cfgJson);
+}
+
+// Both entry points end here: logos-delivery owns the config grammar, so the
+// JSON crosses the FFI boundary verbatim either way.
+QString LogosDeliveryDemoPlugin::startNode(const QString& cfgJson)
+{
+    if (!m_logos) return QStringLiteral("Backend not initialised");
+    if (nodeReady()) return QStringLiteral("Node already created");
+
     qInfo() << "logos_delivery_demo: createNode" << cfgJson;
 
     LogosResult create = m_logos->delivery_module.createNode(cfgJson);
@@ -162,11 +343,12 @@ QString LogosDeliveryDemoPlugin::createNode(QString preset, QString mode, QStrin
     return QString();
 }
 
-// Read the node's fixed attributes. Both are constant for the life of the node
-// — the peer id derives from the node key at construction, the version is a
-// build-time constant of liblogosdelivery — so they are read once per node
-// rather than polled: at init (the node may already exist, created by another
-// module) and on nodeStarted.
+// Read the node's fixed attributes. All three are constant for the life of the
+// node — the peer id derives from the node key at construction, the listening
+// multiaddresses are fixed once it binds, the version is a build-time constant
+// of liblogosdelivery — so they are read once per node rather than polled: at
+// init (the node may already exist, created by another module) and on
+// nodeStarted.
 void LogosDeliveryDemoPlugin::readNodeInfo()
 {
     if (!m_logos) return;
@@ -179,6 +361,12 @@ void LogosDeliveryDemoPlugin::readNodeInfo()
         return;
     }
     setPeerId(peer.getString());
+
+    // Feeding one of these to another node's entry-node peers them locally.
+    LogosResult addrs = m_logos->delivery_module.getNodeInfo(QStringLiteral("MyMultiaddresses"));
+    if (addrs.success) {
+        setMultiaddrs(addrs.getString());
+    }
 
     // logos-delivery (liblogosdelivery) version. Exposed as the "Version"
     // getNodeInfo attribute — the same call delivery_module's own version()
@@ -195,6 +383,7 @@ void LogosDeliveryDemoPlugin::clearNodeInfo()
 {
     setNodeReady(false);
     setPeerId(QString());
+    setMultiaddrs(QString());
     setDeliveryVersion(QString());
 }
 

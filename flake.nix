@@ -16,10 +16,17 @@
     logos-module-builder.url = "github:logos-co/logos-module-builder/0.2.5";
     # follows keeps the module on our builder: emitter and consumer must agree
     # on the binary event wire form.
+    # #94 (configureRln) and the module dependency-chain fix are on master but
+    # not yet tagged, so this pins the merge commit. Repin to a release tag.
     delivery_module = {
-      url = "github:logos-co/logos-delivery-module/606747f2fcdd6e37a004e9a3435a924b87c1e8fb";
+      url = "github:logos-co/logos-delivery-module/514fa12655ddfe0bc3e961dc823ceaa32210f26a";
       inputs.logos-module-builder.follows = "logos-module-builder";
+      inputs.liblogos_rln_module.follows = "liblogos_rln_module";
     };
+    # The demo reads RLN state itself, so it needs its own generated client:
+    # the builder resolves a declared dependency only from a same-named input.
+    # delivery_module follows this one — two instances would bundle twice.
+    liblogos_rln_module.url = "git+https://github.com/logos-co/logos-rln-modules?ref=feat/lip-alignment&dir=logos-rln-module";
   };
 
   outputs = inputs@{ logos-module-builder, ... }:

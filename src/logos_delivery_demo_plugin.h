@@ -3,6 +3,7 @@
 
 #include <QString>
 #include <QVariantList>
+#include <QTimer>
 #include "logos_delivery_demo_interface.h"
 #include "LogosViewPluginBase.h"
 #include "rep_logos_delivery_demo_source.h"
@@ -27,7 +28,9 @@ public:
 
     Q_INVOKABLE void initLogos(LogosAPI* api);
 
+    QString configureRln(QString registryId, QString rlnIdentifier, QString epochSizeSec) override;
     QString createNode(QString preset, QString mode, QString anonymityLevel) override;
+    QString createNodeWithConfig(QString configJson) override;
     QString subscribe(QString topic) override;
     QString unsubscribe(QString topic) override;
     QString sendMessage(QString topic, QString payloadHex) override;
@@ -41,11 +44,21 @@ signals:
 
 private:
     void wireEvents();
+    QString startNode(const QString& cfgJson);
     void readNodeInfo();
     void clearNodeInfo();
 
+    void startRlnPolling();
+    void pollRlnQuota();
+    void pollRlnMembership();
+
     LogosAPI* m_logosAPI = nullptr;
     LogosModules* m_logos = nullptr;
+
+    QString m_rlnRegistryId;
+    QString m_rlnIdentifier;
+    QTimer* m_rlnQuotaTimer = nullptr;
+    QTimer* m_rlnMembershipTimer = nullptr;
 };
 
 #endif // LOGOS_DELIVERY_DEMO_PLUGIN_H

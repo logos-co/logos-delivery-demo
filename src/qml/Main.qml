@@ -16,6 +16,20 @@ Item {
     // "monospace" to the platform's fixed-pitch font.
     readonly property string monoFont: "monospace"
 
+    // The deployed Logos testnet RLN registry — the CAIP-10 account id of the
+    // registration program's config PDA, the same one logos-rln-membership-ui
+    // registers against.
+    readonly property string defaultRegistryId:
+        "logos:testnet:ffa111d7384f0f78d1b0927d38a5c34b6a7d11508cf327cc210610c43e43a219"
+    // This demo's application id: sha256("logos-delivery-demo"). Any 32 bytes
+    // work, but every node that must validate each other's proofs has to share
+    // the value — it is bound into the external nullifier.
+    readonly property string defaultRlnIdentifier:
+        "3a1ae1c9f13a7384d4f32d417c045d50e8eeada9ad6c74bb7022085c123bf824"
+    // Required, not optional: liblogos_rln_module.start() rejects a config
+    // without it, so a blank field fails the call.
+    readonly property string defaultEpochSizeSec: "120"
+
     // Global payload format, driven by the header dropdown. Payloads cross the
     // backend boundary and live in the event log canonically as space-separated
     // hex; UTF-8 is an alternate *view* of the same bytes, applied when reading
@@ -30,8 +44,35 @@ Item {
     readonly property string nodeStatus:    backend ? backend.connectionStatus : "no backend"
     readonly property bool   nodeReady:     backend ? backend.nodeReady       : false
     readonly property string peerIdValue:   backend ? backend.peerId          : ""
+    readonly property string multiaddrsValue: backend ? backend.multiaddrs   : ""
     readonly property string lastErrorValue: backend ? backend.lastError      : ""
     readonly property string deliveryVersionValue: backend ? backend.deliveryVersion : ""
+
+    readonly property bool   rlnConfiguredValue: backend ? backend.rlnConfigured : false
+    readonly property string rlnMembershipStateValue: backend ? backend.rlnMembershipState : ""
+    readonly property string rlnMembershipHashValue: backend ? backend.rlnMembershipHash : ""
+    readonly property int    rlnRateLimitValue: backend ? backend.rlnRateLimit : 0
+    readonly property int    rlnRemainingValue: backend ? backend.rlnRemaining : -1
+    readonly property string rlnEpochIndexValue: backend ? backend.rlnEpochIndex : ""
+    readonly property int    rlnEpochSizeSecValue: backend ? backend.rlnEpochSizeSec : 0
+    readonly property string rlnStatusValue: backend ? backend.rlnStatus : ""
+    readonly property int    rlnProofsValue: backend ? backend.rlnProofs : 0
+    readonly property int    rlnValidationsValue: backend ? backend.rlnValidations : 0
+
+    // Seconds left in the current epoch, ticked locally: the boundary is
+    // derived from the wall clock the same way the module derives it, so the
+    // countdown needs no extra backend round-trip.
+    property int epochSecondsLeft: 0
+    Timer {
+        running: root.rlnConfiguredValue && root.rlnEpochSizeSecValue > 0
+        interval: 1000
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: {
+            const size = root.rlnEpochSizeSecValue
+            root.epochSecondsLeft = size - (Math.floor(Date.now() / 1000) % size)
+        }
+    }
 
     Connections {
         target: backend
@@ -121,6 +162,33 @@ Item {
                 result: success ? "success" : "failed",
                 errorText: success ? "" : message,
                 ts: timestamp
+            })
+        }
+        function onRlnProofRequested(signalHex, epochTimestamp, timestamp) {
+            root.logEvent({
+                eventName: "rlnGenerateProof",
+                direction: "out",
+                hash: signalHex,
+                result: "epoch ts " + epochTimestamp,
+                ts: timestamp
+            })
+        }
+        function onRlnValidationRequested(signalHex, epochTimestamp, timestamp) {
+            root.logEvent({
+                eventName: "rlnValidateProof",
+                direction: "in",
+                hash: signalHex,
+                result: "epoch ts " + epochTimestamp,
+                ts: timestamp
+            })
+        }
+        function onRlnMembershipTransition(membershipHash, state, previous) {
+            root.logEvent({
+                eventName: "rlnMembershipStateChanged",
+                direction: "in",
+                hash: membershipHash,
+                result: previous + " \u2192 " + state,
+                ts: Date.now()
             })
         }
         function onNodeStoppedNotif(success, message, timestamp) {
@@ -219,6 +287,21 @@ Item {
 
     // ── Method-call invocations (logged as local events) ──────────────────────
 
+    function callConfigureRln(registryId, rlnIdentifier, epochSizeSec) {
+        if (!registryId || !rlnIdentifier) return
+        logos.watch(backend.configureRln(registryId, rlnIdentifier, epochSizeSec),
+            function(errStr) {
+                root.logEvent({
+                    eventName: "configureRln() returned",
+                    direction: "local",
+                    config: registryId + " / " + rlnIdentifier,
+                    errorText: errStr || ""
+                })
+            },
+            function(_e) {}
+        )
+    }
+
     function callCreateNode(preset, mode, anonymity) {
         if (!preset || !mode || !anonymity) return
         logos.watch(backend.createNode(preset, mode, anonymity),
@@ -227,6 +310,21 @@ Item {
                     eventName: "createNode() returned",
                     direction: "local",
                     config: preset + " / " + mode + " / " + anonymity,
+                    errorText: errStr || ""
+                })
+            },
+            function(_e) {}
+        )
+    }
+
+    function callCreateNodeWithConfig(configJson) {
+        if (!configJson) return
+        logos.watch(backend.createNodeWithConfig(configJson),
+            function(errStr) {
+                root.logEvent({
+                    eventName: "createNode() returned",
+                    direction: "local",
+                    config: configJson,
                     errorText: errStr || ""
                 })
             },
@@ -492,6 +590,37 @@ Item {
                     }
                 }
 
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.spacing.small
+
+                    LogosText {
+                        text: "Multiaddr:"
+                        font.pixelSize: Theme.typography.secondaryText
+                        color: Theme.palette.textSecondary
+                    }
+                    SelectableValue {
+                        text: root.multiaddrsValue.length > 0
+                              ? root.multiaddrsValue
+                              : "(not available yet)"
+                        font.family: root.monoFont
+                        wrapMode: TextEdit.NoWrap
+                        clip: true
+                        Layout.fillWidth: true
+                        Layout.maximumWidth: implicitWidth
+                    }
+                    InfoChip {
+                        tip: "<b>Multiaddr</b> — every address this node listens on, as the "
+                           + "verbatim <code>getNodeInfo(\"MyMultiaddresses\")</code> string.<br><br>"
+                           + "Read once per node, alongside the peer id.<br><br>"
+                           + "Paste one into another node's <code>entry-node</code> config to "
+                           + "peer two local nodes directly instead of bootstrapping off a "
+                           + "fleet — see the advanced <code>createNode</code> config."
+                    }
+
+                    Item { Layout.fillWidth: true }
+                }
+
                 Rectangle {
                     visible: root.lastErrorValue.length > 0
                     Layout.fillWidth: true
@@ -589,35 +718,263 @@ Item {
         }
 
         // ─── Method-call playground ──────────────────────────────────────────
+        // Configuring the node and using it are disjoint phases — every
+        // configuration call is refused once the node exists, every API call
+        // before it — so only the panels of the current phase are shown.
         ColumnLayout {
             Layout.fillWidth: true
             spacing: Theme.spacing.small
 
-            CreateNodeCall {
-                callEnabled: root.backend && !root.nodeReady
-                infoTip: "<b>delivery_module.createNode(config)</b> + <b>start()</b><br><br>"
-                       + "Create and start the node against a chosen network.<br>"
-                       + "<b>preset</b> — <code>logos.dev</code> (Logos Dev Network) or "
-                       + "<code>logos.test</code> (Logos Test Network); both auto-configure "
-                       + "cluster id, entry nodes, sharding and RLN.<br>"
-                       + "<b>mode</b> — <code>Core</code> (full relay node) or "
-                       + "<code>Edge</code> (light/edge node).<br>"
-                       + "<b>anonymityLevel</b> — sender anonymity through mix: "
-                       + "<code>None</code> (send directly), <code>Preferred</code> or "
-                       + "<code>Required</code>; anything above <code>None</code> mounts mix "
-                       + "and sends over it.<br><br>"
-                       + "The node is no longer started automatically, so you can exercise "
-                       + "the module against different fleets and modes.<br><br>"
-                       + "Can be called once per Logos Core instance: <code>delivery_module</code> "
-                       + "and its node are a singleton shared by every module. If another "
-                       + "module (e.g. chat) created the node, this call is disabled and the "
-                       + "preset/mode chosen there apply — the demo just uses that node."
-                onCall: function(preset, mode, anonymity) { root.callCreateNode(preset, mode, anonymity) }
+            ApiGroup {
+                title: "RLN"
+                Layout.fillWidth: true
+
+                MethodCall {
+                    visible: !root.rlnConfiguredValue
+                    methodName: "configureRln"
+                    arg1Name: "registryId"
+                    arg2Name: "rlnIdentifier"
+                    arg3Name: "epochSizeSec"
+                    arg1Default: root.defaultRegistryId
+                    arg2Default: root.defaultRlnIdentifier
+                    arg3Default: root.defaultEpochSizeSec
+                    // Four digits is a long epoch; the row reads better
+                    // with the space given to the two hex arguments.
+                    arg3Width: 90
+                    callEnabled: root.backend && !root.nodeReady
+                    infoTip: "<b>delivery_module.configureRln(config)</b><br><br>"
+                           + "Turn RLN on for the node this demo is about to create.<br>"
+                           + "<b>registryId</b> — CAIP-10 account id of the registry "
+                           + "deployment. In the <code>logos</code> namespace the account "
+                           + "is the registration program's config PDA and must be the "
+                           + "full 64 hex characters.<br>"
+                           + "<b>rlnIdentifier</b> — per-application id, exactly 64 hex "
+                           + "characters (32 bytes); every node of a deployment must use "
+                           + "the same one.<br>"
+                           + "<b>epochSizeSec</b> — the application's rate-limit epoch "
+                           + "in seconds. Required: the RLN module rejects a start config "
+                           + "without it, and every proof generator and verifier of a "
+                           + "deployment must share the value.<br><br>"
+                           + "All three are prefilled with this demo's defaults — the "
+                           + "deployed testnet registry, this demo's own application id, "
+                           + "and a 120 s epoch.<br><br>"
+                           + "Module-only: the delivery library's RLN plugin is "
+                           + "implementation-agnostic — it names no registry and carries no "
+                           + "config — so this is the one place a membership is named. It "
+                           + "never rides the <code>createNode</code> config.<br><br>"
+                           + "Must be called <i>before</i> <code>createNode()</code>: an "
+                           + "installed plugin is what makes the library mount RLN, and it "
+                           + "reads that at node creation. Without this call the node comes "
+                           + "up with RLN off.<br><br>"
+                           + "The node's membership must already be active — registration "
+                           + "happens out of band, through the RLN module. Without one, "
+                           + "<code>createNode</code> fails at start."
+                    onCall: function(arg1, arg2, arg3) { root.callConfigureRln(arg1, arg2, arg3) }
+                }
+
+                GridLayout {
+                    visible: root.rlnConfiguredValue
+                    Layout.fillWidth: true
+                    columns: 4
+                    columnSpacing: Theme.spacing.medium
+                    rowSpacing: Theme.spacing.small
+
+                    RlnStat {
+                        label: "Membership"
+                        value: root.rlnMembershipStateValue.length > 0
+                               ? root.rlnMembershipStateValue : "reading…"
+                        // Only active and grace_period can generate a proof.
+                        highlight: root.rlnMembershipStateValue === "active"
+                                   || root.rlnMembershipStateValue === "grace_period"
+                                 ? Theme.palette.success
+                                 : root.rlnMembershipStateValue === "pending"
+                                 ? Theme.palette.warning
+                                 : root.rlnMembershipStateValue.length > 0
+                                 ? Theme.palette.error
+                                 : Theme.palette.textSecondary
+                        tip: "<b>liblogos_rln_module.get_membership_state(registryId, rlnIdentifier)</b>"
+                           + "<br><br>The membership backing this scope, re-read every 10 s and "
+                           + "immediately on the module's <code>membership_state_changed</code> "
+                           + "push.<br><br>"
+                           + "<code>active</code> / <code>grace_period</code> can generate proofs; "
+                           + "<code>pending</code> is a submitted registration still confirming; "
+                           + "<code>unknown</code> means no membership resolves for the scope, and "
+                           + "<code>createNode</code> will fail at start.<br><br>"
+                           + "Registration happens out of band, in the RLN membership UI — never "
+                           + "through this demo."
+                    }
+
+                    RlnStat {
+                        label: "Messages left this epoch"
+                        value: root.rlnRemainingValue < 0
+                               ? "—"
+                               : root.rlnRemainingValue + " / " + root.rlnRateLimitValue
+                        highlight: root.rlnRemainingValue < 0    ? Theme.palette.textSecondary
+                                 : root.rlnRemainingValue === 0  ? Theme.palette.error
+                                 : root.rlnRemainingValue <= Math.max(1, root.rlnRateLimitValue / 10)
+                                                                 ? Theme.palette.warning
+                                 :                                 Theme.palette.success
+                        tip: "<b>liblogos_rln_module.get_epoch_quota(registryId, rlnIdentifier, "
+                           + "timestamp)</b><br><br>"
+                           + "The budget still unspent in the current epoch over this "
+                           + "membership's rate limit. Polled every 2 s, and again on every proof "
+                           + "the node generates.<br><br>"
+                           + "Purely local — no registry read. Advisory: "
+                           + "<code>generate_proof</code> stays the allocation authority, so a "
+                           + "send can still come back <code>budget_exhausted</code> if the "
+                           + "budget went between this read and the proof.<br><br>"
+                           + "A rate limit of <code>0</code> always means no usable membership, "
+                           + "never an exhausted budget."
+                    }
+
+                    RlnStat {
+                        label: "Epoch"
+                        value: root.rlnEpochIndexValue.length > 0
+                               ? root.rlnEpochIndexValue + "  (" + root.epochSecondsLeft + "s left)"
+                               : "—"
+                        tip: "<b>Epoch</b> — <code>floor(timestamp / epochSizeSec)</code>, the "
+                           + "index the module encodes into every proof's external nullifier.<br><br>"
+                           + "The countdown to the next boundary is computed locally from the "
+                           + "same wall clock, so it needs no backend call. The budget resets "
+                           + "when it wraps.<br><br>"
+                           + "Epoch size came from <code>configureRln</code>: "
+                           + "<code>" + root.rlnEpochSizeSecValue + " s</code>."
+                    }
+
+                    RlnStat {
+                        label: "Proofs / validations"
+                        value: root.rlnProofsValue + " / " + root.rlnValidationsValue
+                        tip: "<b>delivery_module</b> RLN request events — "
+                           + "<code>dispatchRlnGenerateProofRequestEvent</code> and "
+                           + "<code>dispatchRlnValidateProofRequestEvent</code>.<br><br>"
+                           + "One proof per outbound message, one validation per inbound one, "
+                           + "counted since this view opened. Each is also a line in the event "
+                           + "log above.<br><br>"
+                           + "The delivery library asks an external RLN module for every RLN "
+                           + "operation; these events fire even though the module's in-process "
+                           + "bridge is what answers them."
+                    }
+                }
+
+                RowLayout {
+                    visible: root.rlnConfiguredValue && root.rlnStatusValue.length > 0
+                    Layout.fillWidth: true
+                    spacing: Theme.spacing.small
+
+                    LogosText {
+                        text: root.rlnStatusValue
+                        color: Theme.palette.error
+                        font.pixelSize: Theme.typography.secondaryText
+                        wrapMode: Text.Wrap
+                        Layout.fillWidth: true
+                    }
+                }
+
+                RowLayout {
+                    visible: root.rlnConfiguredValue && root.rlnMembershipHashValue.length > 0
+                    Layout.fillWidth: true
+                    spacing: Theme.spacing.small
+
+                    LogosText {
+                        text: "Membership:"
+                        font.pixelSize: Theme.typography.secondaryText
+                        color: Theme.palette.textSecondary
+                    }
+                    SelectableValue {
+                        text: root.rlnMembershipHashValue
+                        font.family: root.monoFont
+                        wrapMode: TextEdit.NoWrap
+                        clip: true
+                        Layout.fillWidth: true
+                        Layout.maximumWidth: implicitWidth
+                    }
+                    Item { Layout.fillWidth: true }
+                }
             }
+
+            ApiGroup {
+                title: "Configuration"
+                visible: !root.nodeReady
+                Layout.fillWidth: true
+                headerRight: RowLayout {
+                    spacing: Theme.spacing.small
+                    LogosSwitch {
+                        id: advancedNodeConfig
+                        text: "Advanced config"
+                        font.pixelSize: Theme.typography.secondaryText
+                    }
+                    InfoChip {
+                        tip: "<b>Advanced node config</b> — swaps <code>createNode</code>'s three "
+                               + "dropdowns for the raw config.<br><br>"
+                               + "The dropdowns only reach <code>preset</code>, <code>mode</code> "
+                               + "and <code>anonymityLevel</code>. The config itself passes through "
+                               + "to logos-delivery verbatim, which owns the grammar — so writing it "
+                               + "directly reaches everything else: <code>entry-node</code> to peer "
+                               + "with a local node instead of a fleet, <code>cluster-id</code>, "
+                               + "ports, or an <code>entryLayer</code> below the default "
+                               + "<code>channels</code>.<br><br>"
+                               + "Checked for well-formed JSON here; every other error comes back "
+                               + "from logos-delivery."
+                    }
+                }
+
+
+
+                StackLayout {
+                    Layout.fillWidth: true
+                    currentIndex: advancedNodeConfig.checked ? 1 : 0
+
+                    CreateNodeCall {
+                        callEnabled: root.backend && !root.nodeReady
+                        infoTip: "<b>delivery_module.createNode(config)</b> + <b>start()</b><br><br>"
+                               + "Create and start the node against a chosen network.<br>"
+                               + "<b>preset</b> — <code>logos.dev</code> (Logos Dev Network) or "
+                               + "<code>logos.test</code> (Logos Test Network); both auto-configure "
+                               + "cluster id, entry nodes, sharding and RLN.<br>"
+                               + "<b>mode</b> — <code>Core</code> (full relay node) or "
+                               + "<code>Edge</code> (light/edge node).<br>"
+                               + "<b>anonymityLevel</b> — sender anonymity through mix: "
+                               + "<code>None</code> (send directly), <code>Preferred</code> or "
+                               + "<code>Required</code>; anything above <code>None</code> mounts mix "
+                               + "and sends over it.<br><br>"
+                               + "The node is no longer started automatically, so you can exercise "
+                               + "the module against different fleets and modes.<br><br>"
+                               + "Can be called once per Logos Core instance: <code>delivery_module</code> "
+                               + "and its node are a singleton shared by every module. If another "
+                               + "module (e.g. chat) created the node, this call is disabled and the "
+                               + "preset/mode chosen there apply — the demo just uses that node."
+                        onCall: function(preset, mode, anonymity) { root.callCreateNode(preset, mode, anonymity) }
+                    }
+
+                    MethodCall {
+                        methodName: "createNode"
+                        arg1Name: "config (JSON)"
+                        callEnabled: root.backend && !root.nodeReady
+                        infoTip: "<b>delivery_module.createNode(config)</b> + <b>start()</b><br><br>"
+                               + "The config logos-delivery actually receives, written out in "
+                               + "full.<br><br>"
+                               + "Full stack against a fleet:<br>"
+                               + "<code>{\"mode\":\"Core\",\"preset\":\"logos.test\"}</code><br><br>"
+                               + "Peered with a local node instead of a fleet — take the address "
+                               + "from that node's <b>Multiaddr</b> in the header:<br>"
+                               + "<code>{\"mode\":\"Core\",\"preset\":\"logos.test\","
+                               + "\"messagingOverrides\":{\"entry-node\":[\"/ip4/127.0.0.1/tcp/…\"]}}</code>"
+                               + "<br><br>"
+                               + "<code>messagingOverrides</code> takes the messaging layer's conf "
+                               + "keys by their serialized names — <code>entry-node</code>, "
+                               + "<code>cluster-id</code>, <code>tcp-port</code>, "
+                               + "<code>discv5-udp-port</code> — plus <code>anonymityLevel</code>."
+                        onCall: function(arg1, _arg2, _arg3) { root.callCreateNodeWithConfig(arg1) }
+                    }
+                }
+            }
+
+
 
             SplitView {
                 id: apiSplit
 
+                visible: root.nodeReady
                 Layout.fillWidth: true
                 Layout.preferredHeight: Math.max(messagingGroup.implicitHeight,
                                                  channelsGroup.implicitHeight)
@@ -859,6 +1216,7 @@ Item {
         property string title: ""
         property string tag: ""
         default property alias content: groupCol.data
+        property alias headerRight: headerExtra.data
 
         implicitHeight: grpCol.implicitHeight + Theme.spacing.medium * 2
         color: Theme.palette.backgroundSecondary
@@ -906,6 +1264,11 @@ Item {
                 }
 
                 Item { Layout.fillWidth: true }
+
+                RowLayout {
+                    id: headerExtra
+                    spacing: Theme.spacing.small
+                }
             }
 
             ColumnLayout {
@@ -929,6 +1292,11 @@ Item {
         property string arg1Name: ""
         property string arg2Name: ""
         property string arg3Name: ""
+        property string arg1Default: ""
+        property string arg2Default: ""
+        property string arg3Default: ""
+        // 0 fills the row like the other fields; set it for a short value.
+        property int    arg3Width: 0
         property string infoTip: ""
         property bool   callEnabled: true
 
@@ -938,7 +1306,7 @@ Item {
         readonly property bool hasArg3: arg3Name.length > 0
 
         Layout.fillWidth: true
-        Layout.preferredHeight: row.implicitHeight
+        implicitHeight: row.implicitHeight
         color: "transparent"
 
         function invoke() {
@@ -954,6 +1322,7 @@ Item {
             spacing: Theme.spacing.tiny
 
             LogosText {
+                Layout.alignment: Qt.AlignVCenter
                 text: mc.methodName
                 font.family: root.monoFont
                 font.pixelSize: Theme.typography.primaryText
@@ -961,6 +1330,7 @@ Item {
                 color: Theme.palette.primary
             }
             LogosText {
+                Layout.alignment: Qt.AlignVCenter
                 text: "("
                 font.family: root.monoFont
                 font.pixelSize: Theme.typography.primaryText
@@ -969,8 +1339,10 @@ Item {
             // No Layout.minimumWidth: per-field floors add up past the group's
             // width and the row overflows instead of shrinking.
             DemoTextField {
+                Layout.alignment: Qt.AlignVCenter
                 id: arg1Field
                 placeholderText: mc.arg1Name
+                text: mc.arg1Default
                 Layout.fillWidth: true
             }
             Connections {
@@ -978,6 +1350,7 @@ Item {
                 function onAccepted() { mc.invoke() }
             }
             LogosText {
+                Layout.alignment: Qt.AlignVCenter
                 visible: mc.hasArg2
                 text: ","
                 font.family: root.monoFont
@@ -985,9 +1358,11 @@ Item {
                 color: Theme.palette.textSecondary
             }
             DemoTextField {
+                Layout.alignment: Qt.AlignVCenter
                 id: arg2Field
                 visible: mc.hasArg2
                 placeholderText: mc.arg2Name
+                text: mc.arg2Default
                 Layout.fillWidth: mc.hasArg2
             }
             Connections {
@@ -996,6 +1371,7 @@ Item {
                 function onAccepted() { mc.invoke() }
             }
             LogosText {
+                Layout.alignment: Qt.AlignVCenter
                 visible: mc.hasArg3
                 text: ","
                 font.family: root.monoFont
@@ -1003,10 +1379,13 @@ Item {
                 color: Theme.palette.textSecondary
             }
             DemoTextField {
+                Layout.alignment: Qt.AlignVCenter
                 id: arg3Field
                 visible: mc.hasArg3
                 placeholderText: mc.arg3Name
-                Layout.fillWidth: mc.hasArg3
+                text: mc.arg3Default
+                Layout.fillWidth: mc.hasArg3 && mc.arg3Width <= 0
+                Layout.preferredWidth: mc.arg3Width > 0 ? mc.arg3Width : implicitWidth
             }
             Connections {
                 target: arg3Field.textInput
@@ -1014,12 +1393,14 @@ Item {
                 function onAccepted() { mc.invoke() }
             }
             LogosText {
+                Layout.alignment: Qt.AlignVCenter
                 text: ")"
                 font.family: root.monoFont
                 font.pixelSize: Theme.typography.primaryText
                 color: Theme.palette.textSecondary
             }
             DemoButton {
+                Layout.alignment: Qt.AlignVCenter
                 text: "Call"
                 Layout.preferredWidth: 72
                 Layout.preferredHeight: 40
@@ -1031,7 +1412,7 @@ Item {
                          && (!mc.hasArg3 || arg3Field.text.length > 0)
                 onClicked: mc.invoke()
             }
-            InfoChip { tip: mc.infoTip }
+            InfoChip { tip: mc.infoTip; Layout.alignment: Qt.AlignVCenter }
         }
     }
 
@@ -1076,16 +1457,12 @@ Item {
         signal call(string preset, string mode, string anonymity)
 
         Layout.fillWidth: true
-        Layout.preferredHeight: cnRow.implicitHeight + Theme.spacing.medium * 2
-        color: Theme.palette.backgroundSecondary
-        radius: Theme.spacing.radiusMedium
-        border.width: 1
-        border.color: Theme.palette.borderHairline
+        implicitHeight: cnRow.implicitHeight
+        color: "transparent"
 
         RowLayout {
             id: cnRow
             anchors.fill: parent
-            anchors.margins: Theme.spacing.medium
             spacing: Theme.spacing.tiny
 
             LogosText {
@@ -1307,6 +1684,41 @@ Item {
     // Read-only TextEdit styled like LogosText, with mouse/keyboard selection
     // so developers can copy hashes, topics, peer IDs, etc. straight out of
     // the event log.
+    // One RLN figure: its name above the value, with the call that produced it
+    // on the info chip.
+    component RlnStat: ColumnLayout {
+        id: stat
+
+        property string label: ""
+        property string value: ""
+        property string tip: ""
+        property color  highlight: Theme.palette.text
+
+        spacing: Theme.spacing.tiny
+        Layout.fillWidth: true
+        Layout.minimumWidth: 150
+
+        RowLayout {
+            spacing: Theme.spacing.tiny
+            LogosText {
+                text: stat.label
+                font.pixelSize: Theme.typography.secondaryText
+                color: Theme.palette.textSecondary
+            }
+            InfoChip { tip: stat.tip }
+            Item { Layout.fillWidth: true }
+        }
+        LogosText {
+            text: stat.value
+            font.family: root.monoFont
+            font.pixelSize: Theme.typography.primaryText
+            font.weight: Theme.typography.weightBold
+            color: stat.highlight
+            elide: Text.ElideRight
+            Layout.fillWidth: true
+        }
+    }
+
     component SelectableValue: TextEdit {
         readOnly: true
         selectByMouse: true
