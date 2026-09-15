@@ -71,12 +71,12 @@ void LogosDeliveryDemoPlugin::wireEvents()
     });
 
     m_logos->delivery_module.on("messageReceived", [this](const QVariantList& data) {
-        if (data.size() < 4) return;
+        if (data.size() < 5) return;
         // data[2] is the message payload — arbitrary bytes, not text. Surface it
         // as a space-separated hex string so the UI shows it as bytes.
         const QByteArray payload = data.at(2).toByteArray();
 
-        // data[3] is the timestamp as a qint64 unix timestamp (nanoseconds since
+        // data[4] is the timestamp as a qint64 unix timestamp (nanoseconds since
         // epoch). Since logos-delivery-module #29 every event reports its
         // timestamp this way (messageReceived carries the received message's own
         // timestamp; the others carry a local wall-clock time), so the slot is a
@@ -85,7 +85,8 @@ void LogosDeliveryDemoPlugin::wireEvents()
             data.at(1).toString(),                       // contentTopic
             QString::fromLatin1(payload.toHex(' ')),     // payload (hex bytes)
             data.at(0).toString(),                       // messageHash
-            data.at(3).toLongLong());                    // timestamp (qint64, ns since epoch)
+            data.at(3).toString(),                       // source ("live" / "history")
+            data.at(4).toLongLong());                    // timestamp (qint64, ns since epoch)
     });
 
     m_logos->delivery_module.on("messageSent", [this](const QVariantList& data) {
