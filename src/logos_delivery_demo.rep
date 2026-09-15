@@ -18,7 +18,7 @@ class LogosDeliveryDemo
     PROP(int rlnProofs=0 READONLY)
     PROP(int rlnValidations=0 READONLY)
 
-    SIGNAL(messageReceived(QString topic, QString payload, QString messageHash, qint64 timestamp))
+    SIGNAL(messageReceived(QString topic, QString payload, QString messageHash, QString source, qint64 timestamp))
     SIGNAL(messageSentNotif(QString requestId, QString messageHash, qint64 timestamp))
     SIGNAL(messagePropagatedNotif(QString requestId, QString messageHash, qint64 timestamp))
     SIGNAL(messageErrorNotif(QString requestId, QString messageHash, QString errorText, qint64 timestamp))

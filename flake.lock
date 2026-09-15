@@ -700,17 +700,17 @@
         "nix-bundle-lgx": "nix-bundle-lgx"
       },
       "locked": {
-        "lastModified": 1789068887,
-        "narHash": "sha256-Ka1GlVo269k8HIahRF2p8tiMsMUQWMk6RuLuIVyWAoE=",
+        "lastModified": 1789497102,
+        "narHash": "sha256-4ysBTn/IcNijWcArJkgIad1GwXscxp14fCExDp/EvDw=",
         "owner": "logos-co",
         "repo": "logos-delivery-module",
-        "rev": "514fa12655ddfe0bc3e961dc823ceaa32210f26a",
+        "rev": "b908d18a34104e70e1fd48ba472531d92fb10cea",
         "type": "github"
       },
       "original": {
         "owner": "logos-co",
         "repo": "logos-delivery-module",
-        "rev": "514fa12655ddfe0bc3e961dc823ceaa32210f26a",
+        "rev": "b908d18a34104e70e1fd48ba472531d92fb10cea",
         "type": "github"
       }
     },
@@ -7908,18 +7908,18 @@
         "zerokit": "zerokit"
       },
       "locked": {
-        "lastModified": 1788980416,
-        "narHash": "sha256-Sp5G8qG8ipUK4JGefNFUygdkI8R79LG+GILYL6uu/oo=",
+        "lastModified": 1789484241,
+        "narHash": "sha256-8agrD5i4lDAexS8eZRYO1ppKBPotLCAjCpCILLRavEw=",
         "ref": "master",
-        "rev": "03946c68fc44d466277ce878b2471ee3d77b8893",
-        "revCount": 2496,
+        "rev": "41125b1c58b4b83f0305b20debe68741a4092113",
+        "revCount": 2517,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/logos-messaging/logos-delivery"
       },
       "original": {
         "ref": "master",
-        "rev": "03946c68fc44d466277ce878b2471ee3d77b8893",
+        "rev": "41125b1c58b4b83f0305b20debe68741a4092113",
         "submodules": true,
         "type": "git",
         "url": "https://github.com/logos-messaging/logos-delivery"

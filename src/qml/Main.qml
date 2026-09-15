@@ -38,7 +38,7 @@ Item {
     readonly property bool utf8Payloads: payloadFormatBox.currentIndex === 1
 
     // Single global event log. Each entry is an observed event:
-    //   { eventName, direction, config, topic, payload, hash, requestId, errorText, ts }
+    //   { eventName, direction, config, topic, payload, hash, source, requestId, errorText, ts }
     property var events: []
 
     readonly property string nodeStatus:    backend ? backend.connectionStatus : "no backend"
@@ -78,13 +78,14 @@ Item {
         target: backend
         ignoreUnknownSignals: true
 
-        function onMessageReceived(topic, payload, messageHash, timestamp) {
+        function onMessageReceived(topic, payload, messageHash, source, timestamp) {
             root.logEvent({
                 eventName: "messageReceived",
                 direction: "in",
                 topic: topic,
                 payload: payload,
                 hash: messageHash,
+                source: source,
                 ts: timestamp
             })
         }
@@ -671,7 +672,7 @@ Item {
                     }
                     InfoChip {
                         tip: "<b>Event log</b> — every observed event in order, across all topics.<br><br>"
-                           + "<code>messageReceived</code> — a peer sent us a message.<br>"
+                           + "<code>messageReceived</code> — a peer sent us a message; <code>source</code> is <code>live</code> off the network, or <code>history</code> when Store catch-up replayed it after a restart.<br>"
                            + "<code>messageSent</code> — our outgoing message was accepted by the local node.<br>"
                            + "<code>messagePropagated</code> — the message was relayed to the network.<br>"
                            + "<code>messageError</code> — the outgoing message failed.<br>"
@@ -1634,6 +1635,7 @@ Item {
             // bytes, about two wrapped lines.
             FieldRow { name: "payload";   value: evt && evt.payload ? root.formatPayload(evt.payload) : ""; mono: true; multiline: true; truncateAt: 480 }
             FieldRow { name: "hash";      value: evt ? evt.hash      || "" : ""; mono: true }
+            FieldRow { name: "source";    value: evt ? evt.source    || "" : ""; mono: true }
             FieldRow { name: "requestId"; value: evt ? evt.requestId || "" : ""; mono: true }
             FieldRow { name: "result";    value: evt ? evt.result    || "" : ""; mono: true }
             FieldRow { name: "error";     value: evt ? evt.errorText || "" : ""; isError: true; multiline: true }
