@@ -18,6 +18,9 @@ class LogosDeliveryDemo
     PROP(int rlnProofs=0 READONLY)
     PROP(int rlnValidations=0 READONLY)
 
+    // Comma-separated ids of the channels this demo created with a key.
+    PROP(QString encryptedChannels="" READONLY)
+
     SIGNAL(messageReceived(QString topic, QString payload, QString messageHash, QString source, qint64 timestamp))
     SIGNAL(messageSentNotif(QString requestId, QString messageHash, qint64 timestamp))
     SIGNAL(messagePropagatedNotif(QString requestId, QString messageHash, qint64 timestamp))
@@ -25,6 +28,8 @@ class LogosDeliveryDemo
     SIGNAL(channelMessageReceived(QString channelId, QString senderId, QString payload, qint64 timestamp))
     SIGNAL(channelMessageSentNotif(QString channelId, QString requestId, qint64 timestamp))
     SIGNAL(channelMessageErrorNotif(QString channelId, QString requestId, QString errorText, qint64 timestamp))
+    SIGNAL(channelMessageLostNotif(QString channelId, QString payloadHash, QString reason, qint64 timestamp))
+    SIGNAL(channelCipherRan(QString channelId, QString direction, int inBytes, int outBytes, bool ok))
     SIGNAL(connectionStateChangedNotif(QString connectionStatus, qint64 timestamp))
     SIGNAL(nodeStartedNotif(bool success, QString message, qint64 timestamp))
     SIGNAL(nodeStoppedNotif(bool success, QString message, qint64 timestamp))
@@ -38,7 +43,8 @@ class LogosDeliveryDemo
     SLOT(QString subscribe(QString topic))
     SLOT(QString unsubscribe(QString topic))
     SLOT(QString sendMessage(QString topic, QString payloadHex))
-    SLOT(QString channelCreate(QString channelId, QString contentTopic, QString senderId))
+    SLOT(QString channelCreate(QString channelId, QString contentTopic, QString senderId, QString keyHex))
+    SLOT(QString generateChannelKey())
     SLOT(QString channelExists(QString channelId))
     SLOT(QString channelSend(QString channelId, QString payloadHex))
     SLOT(QString channelClose(QString channelId))

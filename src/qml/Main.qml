@@ -146,6 +146,25 @@ Item {
                 ts: timestamp
             })
         }
+        function onChannelMessageLostNotif(channelId, payloadHash, reason, timestamp) {
+            root.logEvent({
+                eventName: "channelMessageLost",
+                direction: "in",
+                channelId: channelId,
+                hash: payloadHash,
+                errorText: reason,
+                ts: timestamp
+            })
+        }
+        function onChannelCipherRan(channelId, direction, inBytes, outBytes, ok) {
+            root.logEvent({
+                eventName: "channelCipher " + direction,
+                direction: "local",
+                channelId: channelId,
+                result: ok ? (inBytes + " B \u2192 " + outBytes + " B")
+                           : (inBytes + " B \u2192 failed (wrong key?)")
+            })
+        }
         function onConnectionStateChangedNotif(connectionStatus, timestamp) {
             root.logEvent({
                 eventName: "connectionStateChanged",
@@ -379,9 +398,9 @@ Item {
         )
     }
 
-    function callChannelCreate(channelId, contentTopic, senderId) {
+    function callChannelCreate(channelId, contentTopic, senderId, keyHex) {
         if (!channelId || !contentTopic || !senderId) return
-        logos.watch(backend.channelCreate(channelId, contentTopic, senderId),
+        logos.watch(backend.channelCreate(channelId, contentTopic, senderId, keyHex || ""),
             function(errStr) {
                 root.logEvent({
                     eventName: "channelCreate() returned",
@@ -389,6 +408,7 @@ Item {
                     channelId: channelId,
                     topic: contentTopic,
                     senderId: senderId,
+                    result: keyHex ? "encrypted" : "plaintext",
                     errorText: errStr || ""
                 })
             },
@@ -1052,23 +1072,55 @@ Item {
                     tag: "Developer Preview"
                     SplitView.fillWidth: true
                     SplitView.minimumWidth: 320
+                    headerRight: RowLayout {
+                        spacing: Theme.spacing.small
+                        LogosText {
+                            visible: backend.encryptedChannels.length > 0
+                            text: "\ud83d\udd12 " + backend.encryptedChannels
+                            font.family: root.monoFont
+                            font.pixelSize: Theme.typography.secondaryText
+                            color: Theme.palette.success
+                        }
+                    }
 
                     MethodCall {
+                        id: channelCreateCall
                         methodName: "channelCreate"
                         arg1Name: "channelId"
                         arg2Name: "contentTopic"
                         arg3Name: "senderId"
+                        arg4Name: "key (hex, optional)"
+                        arg4ButtonText: "Generate"
                         callEnabled: root.nodeReady
-                        infoTip: "<b>delivery_module.channelCreate(channelId, contentTopic, senderId)</b><br><br>"
+                        infoTip: "<b>delivery_module.channelCreate(channelId, contentTopic, senderId, cipherSpec)</b><br><br>"
                                + "Create (or re-open) a <b>reliable channel</b> on a content topic.<br>"
                                + "<b>channelId</b> — application-chosen channel identifier; both peers "
                                + "must use the same id.<br>"
                                + "<b>contentTopic</b> — the content topic the channel communicates on.<br>"
                                + "<b>senderId</b> — this participant's SDS (Scalable Data Sync) sender "
-                               + "identifier; any string unique per participant (e.g. your peer id).<br><br>"
+                               + "identifier; any string unique per participant (e.g. your peer id).<br>"
+                               + "<b>key</b> — a demo-only symmetric key. Leave it empty and the channel "
+                               + "is plaintext on the wire; fill it and this demo becomes the channel's "
+                               + "<b>cipher target</b>.<br><br>"
+                               + "The module holds no key. With a key set, the demo passes a "
+                               + "<code>cipherSpec</code> naming its own "
+                               + "<code>channelEncrypt</code>/<code>channelDecrypt</code> methods, and "
+                               + "<code>delivery_module</code> calls back into the demo for every "
+                               + "segment it sends or receives — the <code>channelCipher</code> log "
+                               + "rows are those calls. The cipher covers the whole SDS message, "
+                               + "repairs included.<br><br>"
+                               + "Give two instances different keys and the receiver's decrypt fails: "
+                               + "that shows up as <code>channelMessageLost</code>, not as silence.<br><br>"
                                + "Persisted channel state survives <code>channelClose()</code>, so "
                                + "re-creating a channel with the same id restores it."
-                        onCall: function(arg1, arg2, arg3) { root.callChannelCreate(arg1, arg2, arg3) }
+                        onArg4ButtonClicked: {
+                            logos.watch(backend.generateChannelKey(),
+                                function(key) { channelCreateCall.setArg4(key) },
+                                function(_e) {})
+                        }
+                        onCall: function(arg1, arg2, arg3, arg4) {
+                            root.callChannelCreate(arg1, arg2, arg3, arg4)
+                        }
                     }
 
                     MethodCall {
@@ -1296,15 +1348,24 @@ Item {
         property string arg1Default: ""
         property string arg2Default: ""
         property string arg3Default: ""
+        // A fourth argument, always optional: the row calls with it empty.
+        property string arg4Name: ""
+        property string arg4Default: ""
+        // Label for a button that fills arg4 in, e.g. "Generate".
+        property string arg4ButtonText: ""
         // 0 fills the row like the other fields; set it for a short value.
         property int    arg3Width: 0
         property string infoTip: ""
         property bool   callEnabled: true
 
-        signal call(string arg1, string arg2, string arg3)
+        signal call(string arg1, string arg2, string arg3, string arg4)
+        signal arg4ButtonClicked()
 
         readonly property bool hasArg2: arg2Name.length > 0
         readonly property bool hasArg3: arg3Name.length > 0
+        readonly property bool hasArg4: arg4Name.length > 0
+
+        function setArg4(text) { arg4Field.text = text }
 
         Layout.fillWidth: true
         implicitHeight: row.implicitHeight
@@ -1314,7 +1375,8 @@ Item {
             if (!mc.callEnabled) return
             mc.call(arg1Field.text,
                     mc.hasArg2 ? arg2Field.text : "",
-                    mc.hasArg3 ? arg3Field.text : "")
+                    mc.hasArg3 ? arg3Field.text : "",
+                    mc.hasArg4 ? arg4Field.text : "")
         }
 
         RowLayout {
@@ -1392,6 +1454,37 @@ Item {
                 target: arg3Field.textInput
                 enabled: mc.hasArg3
                 function onAccepted() { mc.invoke() }
+            }
+            LogosText {
+                Layout.alignment: Qt.AlignVCenter
+                visible: mc.hasArg4
+                text: ","
+                font.family: root.monoFont
+                font.pixelSize: Theme.typography.primaryText
+                color: Theme.palette.textSecondary
+            }
+            DemoTextField {
+                Layout.alignment: Qt.AlignVCenter
+                id: arg4Field
+                visible: mc.hasArg4
+                placeholderText: mc.arg4Name
+                text: mc.arg4Default
+                Layout.fillWidth: mc.hasArg4
+            }
+            Connections {
+                target: arg4Field.textInput
+                enabled: mc.hasArg4
+                function onAccepted() { mc.invoke() }
+            }
+            DemoButton {
+                Layout.alignment: Qt.AlignVCenter
+                visible: mc.hasArg4 && mc.arg4ButtonText.length > 0
+                text: mc.arg4ButtonText
+                Layout.preferredWidth: 96
+                Layout.preferredHeight: 40
+                implicitWidth: 96
+                implicitHeight: 40
+                onClicked: mc.arg4ButtonClicked()
             }
             LogosText {
                 Layout.alignment: Qt.AlignVCenter
@@ -1561,6 +1654,9 @@ Item {
                 case "channelMessageSent":     return Theme.palette.success
                 case "messageError":           return Theme.palette.error
                 case "channelMessageError":    return Theme.palette.error
+                case "channelMessageLost":     return Theme.palette.error
+                case "channelCipher encrypt":
+                case "channelCipher decrypt":  return Theme.palette.primary
                 case "createNode() returned":
                 case "subscribe() returned":
                 case "unsubscribe() returned":

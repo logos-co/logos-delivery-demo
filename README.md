@@ -19,7 +19,8 @@ Pinned to `logos-delivery-module` [**`v0.2.0`**](https://github.com/logos-co/log
 - Turning RLN on for that node with `configureRln(registryId, rlnIdentifier, epochSizeSec)` — a `delivery_module` method of its own, called *before* `createNode`, because the delivery library's RLN plugin names no registry and carries no config
 - Reading the node's fixed attributes through `getNodeInfo` — `MyPeerId`, `MyMultiaddresses` and the `logos-delivery` library `Version`. They are constant for the life of the node, so they are read once (when the view opens and on `nodeStarted`) rather than polled
 - Surfacing `connectionStateChanged` as a live status badge
-- The **Reliable Channels API**: `channelCreate(channelId, contentTopic, senderId)` / `channelExists` / `channelSend` / `channelClose`, with the `channelMessageReceived` / `channelMessageSent` / `channelMessageError` events surfaced in the event log
+- The **Reliable Channels API**: `channelCreate(channelId, contentTopic, senderId, cipherSpec)` / `channelExists` / `channelSend` / `channelClose`, with the `channelMessageReceived` / `channelMessageSent` / `channelMessageError` / `channelMessageLost` events surfaced in the event log
+- **Channel encryption**, where the demo is the cipher and the module only relays: fill the `channelCreate` key field (or press **Generate**) and the module calls the demo's own `channelEncrypt` / `channelDecrypt` for every segment it sends or receives
 - A **global event log** that renders every observed event verbatim — `messageReceived`, `messageSent`, `messagePropagated`, `messageError`, `channelMessageReceived`, `channelMessageSent`, `channelMessageError`, plus the local return values of every playground call — colour-coded by event kind, with every field selectable so you can copy hashes, topics, payloads, request ids
 - A **method-call playground** at the bottom: one card per public `delivery_module` API call, rendered as `methodName(arg…)` with a `Call` button — every interaction is reflected as a row in the event log above. It follows the node's two phases: while there is no node it shows the **RLN** and **Configuration** panels, and once the node is up it swaps Configuration for the API panels — **Messaging** (`subscribe`, `unsubscribe`, `send`) and **Reliable Channels** (`channelCreate`, `channelExists`, `channelSend`, `channelClose`) side by side. The **RLN** panel sits above them across both phases: it carries `configureRln` until that call lands, then shows the membership state and epoch budget live. `createNode`'s three arguments are fixed-choice enums picked from dropdowns, unless **Advanced config** in the Configuration panel's title bar swaps them for the raw config; message payloads are raw **bytes**: a global **Payload format** dropdown in the header switches between **HEX** and **UTF-8** for both payload entry and how payloads render in the event log (switching re-renders payloads already logged)
 - An info `?` chip next to every interactive element with a tooltip spelling out the exact `delivery_module` call behind it — the demo doubles as live API documentation
@@ -122,6 +123,19 @@ nix run . -- --user-dir ~/.local/share/delivery_demo_b
 ```
 
 Then subscribe both to the same content topic and send from one — the other fires `messageReceived`. For channels, run `channelCreate` on both with the *same* `channelId`, then `channelSend` from one and watch `channelMessageReceived` on the other.
+
+### Encrypting a channel
+
+The delivery module holds no key of its own. It takes a `cipherSpec` at `channelCreate` naming a method pair on the module that creates the channel, and calls back into it for every segment — so the crypto stays where the key is.
+
+Press **Generate** next to `channelCreate`'s key field on instance A, copy the hex into instance B's key field, and create the same `channelId` on both. Then:
+
+- `channelSend` from A. The `channelCipher encrypt` rows are the module calling back into the demo, once per segment; B logs `channelCipher decrypt` and then `channelMessageReceived`.
+- The panel title shows 🔒 with the ids of the channels this instance created with a key.
+- Leave the key empty and the callbacks are never installed: the channel is plaintext on the wire, exactly as before.
+- Give B a *different* key and its decrypt fails. The message is dropped and B logs `channelMessageLost` — a key mismatch is visible rather than silent.
+
+The demo's cipher is a SHA-256 keystream with a SHA-256 tag ([`src/demo_channel_cipher.cpp`](src/demo_channel_cipher.cpp)), written to be read in one screen. It is not a sound construction and is not what a real consumer should ship.
 
 The demo specifies no ports, and its layered config gets ephemeral p2p ports from `logos-delivery` (defaulted to `0`), so the OS assigns free ports per instance — the underlying waku listeners (TCP, discv5, …) don't collide.
 

@@ -14,4 +14,6 @@ logos_module(
         src/logos_delivery_demo_interface.h
         src/logos_delivery_demo_plugin.h
         src/logos_delivery_demo_plugin.cpp
+        src/demo_channel_cipher.h
+        src/demo_channel_cipher.cpp
 )

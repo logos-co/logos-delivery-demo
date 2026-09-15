@@ -1,4 +1,5 @@
 #include "logos_delivery_demo_plugin.h"
+#include "demo_channel_cipher.h"
 #include "logos_api.h"
 #include "logos_sdk.h"
 #include "logos_types.h"
@@ -9,6 +10,8 @@
 #include <QJsonObject>
 #include <QJsonParseError>
 #include <QMetaObject>
+#include <QMutexLocker>
+#include <QStringList>
 
 LogosDeliveryDemoPlugin::LogosDeliveryDemoPlugin(QObject* parent)
     : LogosDeliveryDemoSimpleSource(parent)
@@ -122,6 +125,11 @@ void LogosDeliveryDemoPlugin::wireEvents()
     m_logos->delivery_module.on("channelMessageError", [this](const QVariantList& data) {
         if (data.size() < 4) return;
         emit channelMessageErrorNotif(data.at(0).toString(), data.at(1).toString(), data.at(2).toString(), data.at(3).toLongLong());
+    });
+
+    m_logos->delivery_module.on("channelMessageLost", [this](const QVariantList& data) {
+        if (data.size() < 4) return;
+        emit channelMessageLostNotif(data.at(0).toString(), data.at(1).toString(), data.at(2).toString(), data.at(3).toLongLong());
     });
 
     // The delivery library asks for one proof per outbound message and one
@@ -425,15 +433,84 @@ QString LogosDeliveryDemoPlugin::sendMessage(QString topic, QString payloadHex)
     return r.getString();  // request ID
 }
 
-QString LogosDeliveryDemoPlugin::channelCreate(QString channelId, QString contentTopic, QString senderId)
+QString LogosDeliveryDemoPlugin::channelCreate(QString channelId, QString contentTopic, QString senderId, QString keyHex)
 {
     if (!m_logos) return QStringLiteral("Backend not initialised");
-    LogosResult r = m_logos->delivery_module.channelCreate(channelId, contentTopic, senderId);
+
+    const QByteArray key = QByteArray::fromHex(keyHex.trimmed().toLatin1());
+    // An empty key registers no cipher target, so the callbacks stay
+    // uninstalled and the channel is plaintext on the wire.
+    const QString cipherSpec = key.isEmpty()
+        ? QString()
+        : QStringLiteral(R"({"module":"logos_delivery_demo","encrypt":"channelEncrypt","decrypt":"channelDecrypt"})");
+
+    if (!key.isEmpty()) {
+        QMutexLocker lock(&m_channelKeysLock);
+        m_channelKeys.insert(channelId, key);
+    }
+
+    LogosResult r = m_logos->delivery_module.channelCreate(channelId, contentTopic, senderId, cipherSpec);
     if (!r.success) {
+        {
+            QMutexLocker lock(&m_channelKeysLock);
+            m_channelKeys.remove(channelId);
+        }
+        setEncryptedChannels(encryptedChannelList());
         setLastError(QStringLiteral("channelCreate(%1) failed: %2").arg(channelId, r.getError()));
         return r.getError();
     }
+    setEncryptedChannels(encryptedChannelList());
     return QString();
+}
+
+QString LogosDeliveryDemoPlugin::generateChannelKey()
+{
+    return DemoChannelCipher::generateKeyHex();
+}
+
+QString LogosDeliveryDemoPlugin::channelEncrypt(QString channelId, QString payloadB64)
+{
+    return runCipher(channelId, payloadB64, /*encrypting=*/true);
+}
+
+QString LogosDeliveryDemoPlugin::channelDecrypt(QString channelId, QString payloadB64)
+{
+    return runCipher(channelId, payloadB64, /*encrypting=*/false);
+}
+
+QByteArray LogosDeliveryDemoPlugin::channelKey(const QString& channelId) const
+{
+    QMutexLocker lock(&m_channelKeysLock);
+    return m_channelKeys.value(channelId);
+}
+
+QString LogosDeliveryDemoPlugin::encryptedChannelList() const
+{
+    QMutexLocker lock(&m_channelKeysLock);
+    QStringList ids = m_channelKeys.keys();
+    ids.sort();
+    return ids.join(QStringLiteral(", "));
+}
+
+QString LogosDeliveryDemoPlugin::runCipher(const QString& channelId, const QString& payloadB64,
+                                           bool encrypting)
+{
+    const QByteArray key = channelKey(channelId);
+    const QByteArray in = QByteArray::fromBase64(payloadB64.toLatin1());
+    const QByteArray out = encrypting ? DemoChannelCipher::seal(key, in)
+                                      : DemoChannelCipher::open(key, in);
+
+    // Queued: this runs on delivery_module's dispatch thread, and a source
+    // signal has to be emitted on the demo's own.
+    const QString direction = encrypting ? QStringLiteral("encrypt") : QStringLiteral("decrypt");
+    const int inSize = in.size();
+    const int outSize = out.size();
+    const bool ok = !out.isEmpty();
+    QMetaObject::invokeMethod(this, [this, channelId, direction, inSize, outSize, ok] {
+        emit channelCipherRan(channelId, direction, inSize, outSize, ok);
+    }, Qt::QueuedConnection);
+
+    return ok ? QString::fromLatin1(out.toBase64()) : QString();
 }
 
 QString LogosDeliveryDemoPlugin::channelExists(QString channelId)
