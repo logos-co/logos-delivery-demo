@@ -1,6 +1,7 @@
 #include "logos_delivery_demo_plugin.h"
 #include "demo_channel_cipher.h"
 #include "logos_api.h"
+#include "logos_api_provider.h"
 #include "logos_sdk.h"
 #include "logos_types.h"
 
@@ -30,6 +31,14 @@ void LogosDeliveryDemoPlugin::initLogos(LogosAPI* api)
     m_logos = new LogosModules(api);
 
     setBackend(this);
+
+    // ui-host wires a ui_qml plugin up as a CONSUMER only: it adopts a
+    // credential, calls initLogos and publishes the backend for QML, but never
+    // publishes the module as a provider. Without this the demo cannot be
+    // called by name, so delivery_module's cipher relay reaches nothing.
+    if (LogosAPIProvider* provider = api->getProvider()) {
+        provider->registerObject(name(), this);
+    }
 
     wireEvents();
 

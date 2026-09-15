@@ -20,7 +20,7 @@
     # (logos-co/logos-delivery-module#113), which this demo consumes. Repin to a
     # release tag once it lands.
     delivery_module = {
-      url = "github:logos-co/logos-delivery-module/59e5a0f8d9371d291a29cbde14ff6905e1cf37ca";
+      url = "github:logos-co/logos-delivery-module/1dcaf6e64bb6dcb32e987d80cb0bb4382b806b89";
       inputs.logos-module-builder.follows = "logos-module-builder";
       inputs.liblogos_rln_module.follows = "liblogos_rln_module";
     };
