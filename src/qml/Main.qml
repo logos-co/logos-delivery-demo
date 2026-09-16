@@ -1368,7 +1368,7 @@ Item {
         function setArg4(text) { arg4Field.text = text }
 
         Layout.fillWidth: true
-        implicitHeight: row.implicitHeight
+        implicitHeight: col.implicitHeight
         color: "transparent"
 
         function invoke() {
@@ -1379,134 +1379,157 @@ Item {
                     mc.hasArg4 ? arg4Field.text : "")
         }
 
-        RowLayout {
-            id: row
+        ColumnLayout {
+            id: col
             anchors.fill: parent
             spacing: Theme.spacing.tiny
 
-            LogosText {
-                Layout.alignment: Qt.AlignVCenter
-                text: mc.methodName
-                font.family: root.monoFont
-                font.pixelSize: Theme.typography.primaryText
-                font.weight: Theme.typography.weightBold
-                color: Theme.palette.primary
-            }
-            LogosText {
-                Layout.alignment: Qt.AlignVCenter
-                text: "("
-                font.family: root.monoFont
-                font.pixelSize: Theme.typography.primaryText
-                color: Theme.palette.textSecondary
-            }
-            // No Layout.minimumWidth: per-field floors add up past the group's
-            // width and the row overflows instead of shrinking.
-            DemoTextField {
-                Layout.alignment: Qt.AlignVCenter
-                id: arg1Field
-                placeholderText: mc.arg1Name
-                text: mc.arg1Default
+            RowLayout {
+                id: row
                 Layout.fillWidth: true
+                spacing: Theme.spacing.tiny
+
+                LogosText {
+                    Layout.alignment: Qt.AlignVCenter
+                    text: mc.methodName
+                    font.family: root.monoFont
+                    font.pixelSize: Theme.typography.primaryText
+                    font.weight: Theme.typography.weightBold
+                    color: Theme.palette.primary
+                }
+                LogosText {
+                    Layout.alignment: Qt.AlignVCenter
+                    text: "("
+                    font.family: root.monoFont
+                    font.pixelSize: Theme.typography.primaryText
+                    color: Theme.palette.textSecondary
+                }
+                // No Layout.minimumWidth: per-field floors add up past the group's
+                // width and the row overflows instead of shrinking.
+                DemoTextField {
+                    Layout.alignment: Qt.AlignVCenter
+                    id: arg1Field
+                    placeholderText: mc.arg1Name
+                    text: mc.arg1Default
+                    Layout.fillWidth: true
+                }
+                Connections {
+                    target: arg1Field.textInput
+                    function onAccepted() { mc.invoke() }
+                }
+                LogosText {
+                    Layout.alignment: Qt.AlignVCenter
+                    visible: mc.hasArg2
+                    text: ","
+                    font.family: root.monoFont
+                    font.pixelSize: Theme.typography.primaryText
+                    color: Theme.palette.textSecondary
+                }
+                DemoTextField {
+                    Layout.alignment: Qt.AlignVCenter
+                    id: arg2Field
+                    visible: mc.hasArg2
+                    placeholderText: mc.arg2Name
+                    text: mc.arg2Default
+                    Layout.fillWidth: mc.hasArg2
+                }
+                Connections {
+                    target: arg2Field.textInput
+                    enabled: mc.hasArg2
+                    function onAccepted() { mc.invoke() }
+                }
+                LogosText {
+                    Layout.alignment: Qt.AlignVCenter
+                    visible: mc.hasArg3
+                    text: ","
+                    font.family: root.monoFont
+                    font.pixelSize: Theme.typography.primaryText
+                    color: Theme.palette.textSecondary
+                }
+                DemoTextField {
+                    Layout.alignment: Qt.AlignVCenter
+                    id: arg3Field
+                    visible: mc.hasArg3
+                    placeholderText: mc.arg3Name
+                    text: mc.arg3Default
+                    Layout.fillWidth: mc.hasArg3 && mc.arg3Width <= 0
+                    Layout.preferredWidth: mc.arg3Width > 0 ? mc.arg3Width : implicitWidth
+                }
+                Connections {
+                    target: arg3Field.textInput
+                    enabled: mc.hasArg3
+                    function onAccepted() { mc.invoke() }
+                }
+                LogosText {
+                    Layout.alignment: Qt.AlignVCenter
+                    visible: mc.hasArg4
+                    text: ","
+                    font.family: root.monoFont
+                    font.pixelSize: Theme.typography.primaryText
+                    color: Theme.palette.textSecondary
+                }
+                LogosText {
+                    Layout.alignment: Qt.AlignVCenter
+                    visible: !mc.hasArg4
+                    text: ")"
+                    font.family: root.monoFont
+                    font.pixelSize: Theme.typography.primaryText
+                    color: Theme.palette.textSecondary
+                }
+                DemoButton {
+                    Layout.alignment: Qt.AlignVCenter
+                    text: "Call"
+                    Layout.preferredWidth: 72
+                    Layout.preferredHeight: 40
+                    implicitWidth: 72
+                    implicitHeight: 40
+                    enabled: mc.callEnabled
+                             && arg1Field.text.length > 0
+                             && (!mc.hasArg2 || arg2Field.text.length > 0)
+                             && (!mc.hasArg3 || arg3Field.text.length > 0)
+                    onClicked: mc.invoke()
+                }
+                InfoChip { tip: mc.infoTip; Layout.alignment: Qt.AlignVCenter }
             }
-            Connections {
-                target: arg1Field.textInput
-                function onAccepted() { mc.invoke() }
-            }
-            LogosText {
-                Layout.alignment: Qt.AlignVCenter
-                visible: mc.hasArg2
-                text: ","
-                font.family: root.monoFont
-                font.pixelSize: Theme.typography.primaryText
-                color: Theme.palette.textSecondary
-            }
-            DemoTextField {
-                Layout.alignment: Qt.AlignVCenter
-                id: arg2Field
-                visible: mc.hasArg2
-                placeholderText: mc.arg2Name
-                text: mc.arg2Default
-                Layout.fillWidth: mc.hasArg2
-            }
-            Connections {
-                target: arg2Field.textInput
-                enabled: mc.hasArg2
-                function onAccepted() { mc.invoke() }
-            }
-            LogosText {
-                Layout.alignment: Qt.AlignVCenter
-                visible: mc.hasArg3
-                text: ","
-                font.family: root.monoFont
-                font.pixelSize: Theme.typography.primaryText
-                color: Theme.palette.textSecondary
-            }
-            DemoTextField {
-                Layout.alignment: Qt.AlignVCenter
-                id: arg3Field
-                visible: mc.hasArg3
-                placeholderText: mc.arg3Name
-                text: mc.arg3Default
-                Layout.fillWidth: mc.hasArg3 && mc.arg3Width <= 0
-                Layout.preferredWidth: mc.arg3Width > 0 ? mc.arg3Width : implicitWidth
-            }
-            Connections {
-                target: arg3Field.textInput
-                enabled: mc.hasArg3
-                function onAccepted() { mc.invoke() }
-            }
-            LogosText {
-                Layout.alignment: Qt.AlignVCenter
+
+            // The fourth argument continues on its own line, indented under the
+            // opening paren, so a long value does not squeeze the other three.
+            RowLayout {
+                Layout.fillWidth: true
                 visible: mc.hasArg4
-                text: ","
-                font.family: root.monoFont
-                font.pixelSize: Theme.typography.primaryText
-                color: Theme.palette.textSecondary
+                spacing: Theme.spacing.tiny
+
+                Item { Layout.preferredWidth: Theme.spacing.large }
+                DemoTextField {
+                    Layout.alignment: Qt.AlignVCenter
+                    id: arg4Field
+                    placeholderText: mc.arg4Name
+                    text: mc.arg4Default
+                    Layout.fillWidth: true
+                }
+                Connections {
+                    target: arg4Field.textInput
+                    enabled: mc.hasArg4
+                    function onAccepted() { mc.invoke() }
+                }
+                LogosText {
+                    Layout.alignment: Qt.AlignVCenter
+                    text: ")"
+                    font.family: root.monoFont
+                    font.pixelSize: Theme.typography.primaryText
+                    color: Theme.palette.textSecondary
+                }
+                DemoButton {
+                    Layout.alignment: Qt.AlignVCenter
+                    visible: mc.arg4ButtonText.length > 0
+                    text: mc.arg4ButtonText
+                    Layout.preferredWidth: 96
+                    Layout.preferredHeight: 40
+                    implicitWidth: 96
+                    implicitHeight: 40
+                    onClicked: mc.arg4ButtonClicked()
+                }
             }
-            DemoTextField {
-                Layout.alignment: Qt.AlignVCenter
-                id: arg4Field
-                visible: mc.hasArg4
-                placeholderText: mc.arg4Name
-                text: mc.arg4Default
-                Layout.fillWidth: mc.hasArg4
-            }
-            Connections {
-                target: arg4Field.textInput
-                enabled: mc.hasArg4
-                function onAccepted() { mc.invoke() }
-            }
-            DemoButton {
-                Layout.alignment: Qt.AlignVCenter
-                visible: mc.hasArg4 && mc.arg4ButtonText.length > 0
-                text: mc.arg4ButtonText
-                Layout.preferredWidth: 96
-                Layout.preferredHeight: 40
-                implicitWidth: 96
-                implicitHeight: 40
-                onClicked: mc.arg4ButtonClicked()
-            }
-            LogosText {
-                Layout.alignment: Qt.AlignVCenter
-                text: ")"
-                font.family: root.monoFont
-                font.pixelSize: Theme.typography.primaryText
-                color: Theme.palette.textSecondary
-            }
-            DemoButton {
-                Layout.alignment: Qt.AlignVCenter
-                text: "Call"
-                Layout.preferredWidth: 72
-                Layout.preferredHeight: 40
-                implicitWidth: 72
-                implicitHeight: 40
-                enabled: mc.callEnabled
-                         && arg1Field.text.length > 0
-                         && (!mc.hasArg2 || arg2Field.text.length > 0)
-                         && (!mc.hasArg3 || arg3Field.text.length > 0)
-                onClicked: mc.invoke()
-            }
-            InfoChip { tip: mc.infoTip; Layout.alignment: Qt.AlignVCenter }
         }
     }
 
