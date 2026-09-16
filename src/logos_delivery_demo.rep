@@ -8,6 +8,9 @@ class LogosDeliveryDemo
     PROP(QString deliveryVersion="" READONLY)
 
     PROP(bool rlnConfigured=false READONLY)
+    PROP(QString rlnState="Disabled" READONLY)
+    PROP(QString rlnStateMessage="" READONLY)
+    PROP(QString rlnRegistryId="" READONLY)
     PROP(QString rlnMembershipState="" READONLY)
     PROP(QString rlnMembershipHash="" READONLY)
     PROP(int rlnRateLimit=0 READONLY)
@@ -31,8 +34,8 @@ class LogosDeliveryDemo
     SIGNAL(rlnProofRequested(QString signalHex, qint64 epochTimestamp, qint64 timestamp))
     SIGNAL(rlnValidationRequested(QString signalHex, qint64 epochTimestamp, qint64 timestamp))
     SIGNAL(rlnMembershipTransition(QString membershipHash, QString state, QString previous))
+    SIGNAL(rlnStateChangedNotif(QString state, QString message, qint64 timestamp))
 
-    SLOT(QString configureRln(QString registryId, QString rlnIdentifier, QString epochSizeSec))
     SLOT(QString createNode(QString preset, QString mode, QString anonymityLevel))
     SLOT(QString createNodeWithConfig(QString configJson))
     SLOT(QString subscribe(QString topic))

@@ -16,20 +16,6 @@ Item {
     // "monospace" to the platform's fixed-pitch font.
     readonly property string monoFont: "monospace"
 
-    // The deployed Logos testnet RLN registry — the CAIP-10 account id of the
-    // registration program's config PDA, the same one logos-rln-membership-ui
-    // registers against.
-    readonly property string defaultRegistryId:
-        "logos:testnet:ffa111d7384f0f78d1b0927d38a5c34b6a7d11508cf327cc210610c43e43a219"
-    // This demo's application id: sha256("logos-delivery-demo"). Any 32 bytes
-    // work, but every node that must validate each other's proofs has to share
-    // the value — it is bound into the external nullifier.
-    readonly property string defaultRlnIdentifier:
-        "3a1ae1c9f13a7384d4f32d417c045d50e8eeada9ad6c74bb7022085c123bf824"
-    // Required, not optional: liblogos_rln_module.start() rejects a config
-    // without it, so a blank field fails the call.
-    readonly property string defaultEpochSizeSec: "120"
-
     // Global payload format, driven by the header dropdown. Payloads cross the
     // backend boundary and live in the event log canonically as space-separated
     // hex; UTF-8 is an alternate *view* of the same bytes, applied when reading
@@ -49,6 +35,9 @@ Item {
     readonly property string deliveryVersionValue: backend ? backend.deliveryVersion : ""
 
     readonly property bool   rlnConfiguredValue: backend ? backend.rlnConfigured : false
+    readonly property string rlnStateValue: backend ? backend.rlnState : "Disabled"
+    readonly property string rlnStateMessageValue: backend ? backend.rlnStateMessage : ""
+    readonly property string rlnRegistryIdValue: backend ? backend.rlnRegistryId : ""
     readonly property string rlnMembershipStateValue: backend ? backend.rlnMembershipState : ""
     readonly property string rlnMembershipHashValue: backend ? backend.rlnMembershipHash : ""
     readonly property int    rlnRateLimitValue: backend ? backend.rlnRateLimit : 0
@@ -183,6 +172,16 @@ Item {
                 ts: timestamp
             })
         }
+        function onRlnStateChangedNotif(state, message, timestamp) {
+            root.logEvent({
+                eventName: "rlnStateChanged",
+                direction: "in",
+                result: state,
+                errorText: message || "",
+                ts: timestamp
+            })
+        }
+
         function onRlnMembershipTransition(membershipHash, state, previous) {
             root.logEvent({
                 eventName: "rlnMembershipStateChanged",
@@ -288,20 +287,6 @@ Item {
 
     // ── Method-call invocations (logged as local events) ──────────────────────
 
-    function callConfigureRln(registryId, rlnIdentifier, epochSizeSec) {
-        if (!registryId || !rlnIdentifier) return
-        logos.watch(backend.configureRln(registryId, rlnIdentifier, epochSizeSec),
-            function(errStr) {
-                root.logEvent({
-                    eventName: "configureRln() returned",
-                    direction: "local",
-                    config: registryId + " / " + rlnIdentifier,
-                    errorText: errStr || ""
-                })
-            },
-            function(_e) {}
-        )
-    }
 
     function callCreateNode(preset, mode, anonymity) {
         if (!preset || !mode || !anonymity) return
@@ -497,6 +482,37 @@ Item {
                     }
 
                     Item { Layout.fillWidth: true }
+
+                    LogosBadge {
+                        text: "RLN " + root.rlnStateValue
+                        color: root.rlnStateValue === "Ready"        ? Theme.palette.success
+                             : root.rlnStateValue === "Initializing" ? Theme.palette.warning
+                             : root.rlnStateValue === "Failed"       ? Theme.palette.error
+                             :                                         Theme.palette.textSecondary
+                    }
+                    InfoChip {
+                        tip: "<b>RLN state</b> — where this node's rate limiting stands, from "
+                           + "<code>delivery_module</code>'s <code>rlnState()</code> and its "
+                           + "<code>rlnStateChanged</code> event.<br><br>"
+                           + "<code>Disabled</code> — no node yet, or the node's network "
+                           + "preset carries no RLN (every shipped preset today).<br>"
+                           + "<code>Initializing</code> — the library's RLN plugin is "
+                           + "installed and the backend is coming up (yellow).<br>"
+                           + "<code>Ready</code> — the in-process bridge answers requests "
+                           + "(green).<br>"
+                           + "<code>Failed</code> — bring-up failed (red); the reason is in "
+                           + "the event log.<br><br>"
+                           + "There is no RLN method to call: the <code>preset</code> passed "
+                           + "to <code>createNode</code> decides the registry, the epoch size "
+                           + "and the application identifier, because all three are "
+                           + "properties of a deployment rather than of this app.<br><br>"
+                           + "Bring-up reaches the chain, so <code>createNode</code> runs it "
+                           + "on its own thread and returns first — which is why this badge "
+                           + "moves after the node already exists.<br><br>"
+                           + "<code>Ready</code> does not promise the RLN module's valid-root "
+                           + "window is warm; that is a background refresh it exposes no "
+                           + "probe for."
+                    }
 
                     LogosBadge {
                         text: root.nodeReady ? root.nodeStatus : "no node — call createNode"
@@ -730,47 +746,38 @@ Item {
                 title: "RLN"
                 Layout.fillWidth: true
 
-                MethodCall {
+                RowLayout {
                     visible: !root.rlnConfiguredValue
-                    methodName: "configureRln"
-                    arg1Name: "registryId"
-                    arg2Name: "rlnIdentifier"
-                    arg3Name: "epochSizeSec"
-                    arg1Default: root.defaultRegistryId
-                    arg2Default: root.defaultRlnIdentifier
-                    arg3Default: root.defaultEpochSizeSec
-                    // Four digits is a long epoch; the row reads better
-                    // with the space given to the two hex arguments.
-                    arg3Width: 90
-                    callEnabled: root.backend && !root.nodeReady
-                    infoTip: "<b>delivery_module.configureRln(config)</b><br><br>"
-                           + "Turn RLN on for the node this demo is about to create.<br>"
-                           + "<b>registryId</b> — CAIP-10 account id of the registry "
-                           + "deployment. In the <code>logos</code> namespace the account "
-                           + "is the registration program's config PDA and must be the "
-                           + "full 64 hex characters.<br>"
-                           + "<b>rlnIdentifier</b> — per-application id, exactly 64 hex "
-                           + "characters (32 bytes); every node of a deployment must use "
-                           + "the same one.<br>"
-                           + "<b>epochSizeSec</b> — the application's rate-limit epoch "
-                           + "in seconds. Required: the RLN module rejects a start config "
-                           + "without it, and every proof generator and verifier of a "
-                           + "deployment must share the value.<br><br>"
-                           + "All three are prefilled with this demo's defaults — the "
-                           + "deployed testnet registry, this demo's own application id, "
-                           + "and a 120 s epoch.<br><br>"
-                           + "Module-only: the delivery library's RLN plugin is "
-                           + "implementation-agnostic — it names no registry and carries no "
-                           + "config — so this is the one place a membership is named. It "
-                           + "never rides the <code>createNode</code> config.<br><br>"
-                           + "Must be called <i>before</i> <code>createNode()</code>: an "
-                           + "installed plugin is what makes the library mount RLN, and it "
-                           + "reads that at node creation. Without this call the node comes "
-                           + "up with RLN off.<br><br>"
-                           + "The node's membership must already be active — registration "
-                           + "happens out of band, through the RLN module. Without one, "
-                           + "<code>createNode</code> fails at start."
-                    onCall: function(arg1, arg2, arg3) { root.callConfigureRln(arg1, arg2, arg3) }
+                    Layout.fillWidth: true
+                    spacing: Theme.spacing.small
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: root.rlnStateValue === "Failed"
+                              ? "RLN bring-up failed: " + root.rlnStateMessageValue
+                              : root.rlnStateValue === "Initializing"
+                              ? "RLN is coming up…"
+                              : "RLN is off for this node's preset."
+                        font.family: root.monoFont
+                        font.pixelSize: Theme.typography.secondaryText
+                        color: root.rlnStateValue === "Failed" ? Theme.palette.error
+                                                               : Theme.palette.textSecondary
+                        wrapMode: Text.WordWrap
+                    }
+                    InfoChip {
+                        tip: "<b>RLN has no method to call.</b><br><br>"
+                           + "The <code>preset</code> given to <code>createNode</code> "
+                           + "selects the registry, the application identifier and the "
+                           + "epoch size together, because every node of a deployment must "
+                           + "agree on all three — an identifier that disagrees with its "
+                           + "peers' rejects every message as invalid.<br><br>"
+                           + "Every shipped preset runs with RLN off. A deployment that "
+                           + "turns it on supplies its own table through the module's "
+                           + "<code>LOGOS_DELIVERY_RLN_PRESETS</code> file.<br><br>"
+                           + "The membership must already be active — registration happens "
+                           + "out of band, through the RLN module — or the node fails at "
+                           + "<code>start</code>."
+                    }
                 }
 
                 GridLayout {
@@ -838,7 +845,7 @@ Item {
                            + "The countdown to the next boundary is computed locally from the "
                            + "same wall clock, so it needs no backend call. The budget resets "
                            + "when it wraps.<br><br>"
-                           + "Epoch size came from <code>configureRln</code>: "
+                           + "Epoch size came from the node's preset: "
                            + "<code>" + root.rlnEpochSizeSecValue + " s</code>."
                     }
 

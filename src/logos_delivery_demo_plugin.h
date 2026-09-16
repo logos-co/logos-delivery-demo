@@ -28,7 +28,6 @@ public:
 
     Q_INVOKABLE void initLogos(LogosAPI* api);
 
-    QString configureRln(QString registryId, QString rlnIdentifier, QString epochSizeSec) override;
     QString createNode(QString preset, QString mode, QString anonymityLevel) override;
     QString createNodeWithConfig(QString configJson) override;
     QString subscribe(QString topic) override;
@@ -48,6 +47,7 @@ private:
     void readNodeInfo();
     void clearNodeInfo();
 
+    void adoptRlnDeployment();
     void startRlnPolling();
     void pollRlnQuota();
     void pollRlnMembership();
