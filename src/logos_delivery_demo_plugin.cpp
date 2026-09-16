@@ -28,6 +28,9 @@ void LogosDeliveryDemoPlugin::initLogos(LogosAPI* api)
 {
     if (m_logos) return;
     m_logosAPI = api;
+    // PluginInterface::logosAPI, which QtProviderObject::callMethod requires
+    // before it will dispatch an inbound call.
+    logosAPI = api;
     m_logos = new LogosModules(api);
 
     setBackend(this);
@@ -453,20 +456,22 @@ QString LogosDeliveryDemoPlugin::channelCreate(QString channelId, QString conten
         ? QString()
         : QStringLiteral(R"({"module":"logos_delivery_demo","encrypt":"channelEncrypt","decrypt":"channelDecrypt"})");
 
-    if (!key.isEmpty()) {
-        QMutexLocker lock(&m_channelKeysLock);
-        m_channelKeys.insert(channelId, key);
-    }
-
+    // Published only once the module has accepted the channel: a failed call
+    // leaves an already-open channel's key alone, and an empty key drops the
+    // old one, since that channel is plaintext from here on.
     LogosResult r = m_logos->delivery_module.channelCreate(channelId, contentTopic, senderId, cipherSpec);
     if (!r.success) {
-        {
-            QMutexLocker lock(&m_channelKeysLock);
-            m_channelKeys.remove(channelId);
-        }
-        setEncryptedChannels(encryptedChannelList());
         setLastError(QStringLiteral("channelCreate(%1) failed: %2").arg(channelId, r.getError()));
         return r.getError();
+    }
+
+    {
+        QMutexLocker lock(&m_channelKeysLock);
+        if (key.isEmpty()) {
+            m_channelKeys.remove(channelId);
+        } else {
+            m_channelKeys.insert(channelId, key);
+        }
     }
     setEncryptedChannels(encryptedChannelList());
     return QString();
@@ -554,5 +559,10 @@ QString LogosDeliveryDemoPlugin::channelClose(QString channelId)
         setLastError(QStringLiteral("channelClose(%1) failed: %2").arg(channelId, r.getError()));
         return r.getError();
     }
+    {
+        QMutexLocker lock(&m_channelKeysLock);
+        m_channelKeys.remove(channelId);
+    }
+    setEncryptedChannels(encryptedChannelList());
     return QString();
 }
