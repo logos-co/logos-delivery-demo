@@ -20,7 +20,7 @@ class LogosDeliveryDemoPlugin : public LogosDeliveryDemoSimpleSource,
 {
     Q_OBJECT
     Q_PLUGIN_METADATA(IID LogosDeliveryDemoInterface_iid FILE "metadata.json")
-    Q_INTERFACES(LogosDeliveryDemoInterface)
+    Q_INTERFACES(LogosDeliveryDemoInterface PluginInterface)
 
 public:
     explicit LogosDeliveryDemoPlugin(QObject* parent = nullptr);
