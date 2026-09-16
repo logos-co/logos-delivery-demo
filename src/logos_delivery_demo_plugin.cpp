@@ -1,7 +1,6 @@
 #include "logos_delivery_demo_plugin.h"
 #include "demo_channel_cipher.h"
 #include "logos_api.h"
-#include "logos_api_provider.h"
 #include "logos_sdk.h"
 #include "logos_types.h"
 
@@ -28,16 +27,10 @@ void LogosDeliveryDemoPlugin::initLogos(LogosAPI* api)
 {
     if (m_logos) return;
     m_logosAPI = api;
-    logosAPI = api; // QtProviderObject::callMethod refuses to dispatch without it
+    logosAPI = api;
     m_logos = new LogosModules(api);
 
     setBackend(this);
-
-    // ui-host registers a ui_qml plugin as a consumer only, and delivery_module
-    // has to reach channelEncrypt by name.
-    if (LogosAPIProvider* provider = api->getProvider()) {
-        provider->registerObject(name(), this);
-    }
 
     wireEvents();
 
