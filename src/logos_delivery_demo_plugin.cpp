@@ -139,6 +139,29 @@ void LogosDeliveryDemoPlugin::wireEvents()
         emit rlnValidationRequested(data.at(3).toString(), data.at(4).toLongLong(), data.at(6).toLongLong());
     });
 
+    // RLN is not configured from here any more: the node's network preset
+    // decides whether it runs, and delivery_module reports the bring-up it
+    // then does on its own thread.
+    m_logos->delivery_module.on("rlnStateChanged", [this](const QVariantList& data) {
+        if (data.size() < 3) return;
+        const QString state = data.at(0).toString();
+        const QString message = data.at(1).toString();
+        const qint64 timestamp = data.at(2).toLongLong();
+        // Queued for the same reason as nodeStarted above.
+        QMetaObject::invokeMethod(this, [this, state, message, timestamp] {
+            qInfo() << "logos_delivery_demo: rln state" << state << message;
+            setRlnState(state);
+            setRlnStateMessage(message);
+            emit rlnStateChangedNotif(state, message, timestamp);
+
+            if (state == QStringLiteral("Ready")) {
+                adoptRlnDeployment();
+            } else if (state != QStringLiteral("Initializing")) {
+                setRlnConfigured(false);
+            }
+        }, Qt::QueuedConnection);
+    });
+
     // A push from the RLN module's confirmation poller. get_membership_state
     // stays the authority, so this only wakes an immediate re-read.
     m_logos->liblogos_rln_module.onMembership_state_changed(
@@ -239,42 +262,30 @@ void LogosDeliveryDemoPlugin::pollRlnMembership()
         });
 }
 
-QString LogosDeliveryDemoPlugin::configureRln(QString registryId, QString rlnIdentifier,
-                                             QString epochSizeSec)
+// The node's preset owns the RLN deployment, so the scope every rln_module
+// call needs is read back from delivery_module rather than held here.
+void LogosDeliveryDemoPlugin::adoptRlnDeployment()
 {
-    if (!m_logos) return QStringLiteral("Backend not initialised");
-    if (nodeReady()) return QStringLiteral("Node already created");
+    if (!m_logos) return;
 
-    QJsonObject cfg{
-        {"registry-id", registryId.trimmed()},
-        {"rln-identifier", rlnIdentifier.trimmed()},
-    };
-
-    // Not optional: liblogos_rln_module.start() refuses a config without it,
-    // and delivery_module only forwards the key when it is set.
-    bool epochOk = false;
-    const qint64 epoch = epochSizeSec.trimmed().toLongLong(&epochOk);
-    if (!epochOk || epoch <= 0) return QStringLiteral("epochSizeSec must be a positive integer");
-    cfg.insert(QStringLiteral("epoch-size-sec"), epoch);
-
-    const QString cfgJson = QString::fromUtf8(QJsonDocument(cfg).toJson(QJsonDocument::Compact));
-    qInfo() << "logos_delivery_demo: configureRln" << cfgJson;
-
-    LogosResult configured = m_logos->delivery_module.configureRln(cfgJson);
-    if (!configured.success) {
-        setLastError(QStringLiteral("configureRln failed: %1").arg(configured.getError()));
-        return configured.getError();
+    LogosResult state = m_logos->delivery_module.rlnState();
+    if (!state.success) {
+        setLastError(QStringLiteral("rlnState failed: %1").arg(state.getError()));
+        return;
     }
 
-    qInfo() << "logos_delivery_demo: configureRln succeeded";
+    const QJsonObject obj = rlnObject(state.value);
+    m_rlnRegistryId = obj.value(QStringLiteral("registryId")).toString();
+    m_rlnIdentifier = obj.value(QStringLiteral("rlnIdentifier")).toString();
+    if (m_rlnRegistryId.isEmpty() || m_rlnIdentifier.isEmpty()) {
+        setLastError(QStringLiteral("rlnState reported Ready without a deployment"));
+        return;
+    }
 
-    m_rlnRegistryId = registryId.trimmed();
-    m_rlnIdentifier = rlnIdentifier.trimmed();
-    setRlnEpochSizeSec(static_cast<int>(epoch));
+    setRlnRegistryId(m_rlnRegistryId);
+    setRlnEpochSizeSec(obj.value(QStringLiteral("epochSizeSec")).toInt());
     setRlnConfigured(true);
     startRlnPolling();
-
-    return QString();
 }
 
 QString LogosDeliveryDemoPlugin::createNode(QString preset, QString mode, QString anonymityLevel)
