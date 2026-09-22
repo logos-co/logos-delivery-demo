@@ -13,13 +13,11 @@
   inputs = {
     # Same release logos-delivery-module pins. Below 0.2.5 binary event
     # payloads arrive empty (logos-cpp-sdk#99).
-    logos-module-builder.url = "github:logos-co/logos-module-builder/0.2.5";
+    logos-module-builder.url = "github:logos-co/logos-module-builder/0.3.0";
     # follows keeps the module on our builder: emitter and consumer must agree
     # on the binary event wire form.
-    # #118 removed configureRln and added rlnState; it is on master but not yet
-    # tagged, so this pins the merge commit. Repin to a release tag.
     delivery_module = {
-      url = "github:logos-co/logos-delivery-module/7835f897f099ce10a4f8a2357cfdcaecf2bbee46";
+      url = "github:logos-co/logos-delivery-module/v0.3.0-rc.1";
       inputs.logos-module-builder.follows = "logos-module-builder";
       inputs.liblogos_rln_module.follows = "liblogos_rln_module";
     };
