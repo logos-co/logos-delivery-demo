@@ -1,5 +1,6 @@
 {
-  "name": "logos_delivery_demo",
+  "name": "delivery_demo",
+  "display_name": "Delivery Demo",
   "version": "0.3.0",
   "type": "ui_qml",
   "category": "messaging",
