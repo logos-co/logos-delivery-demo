@@ -67,7 +67,7 @@ The C++ backend lives in the `ui-host` process; the QML view runs in the host ap
 
 ## Network
 
-The node is **not** started automatically. On start-up the playground shows only the **Configuration** panel. Use its `createNode` row to create and start the node against a chosen network: pick the preset — **`logos.test`** (Logos Test Network, the default) or **`logos.dev`** (Logos Dev Network) — the node **mode** — `Core` (full relay node) or `Edge` (light node) — and the sender **anonymity level** — `None` (send directly), `Preferred` or `Required`, where anything above `None` mounts mix and routes sends over it. Once the node is ready the Configuration panel gives way to the Messaging and Reliable Channels panels. `createNode` can be called once per session; to switch fleet/mode, restart the app.
+The node is **not** started automatically. On start-up the playground shows only the **Configuration** panel. Use its `createNode` row to create and start the node against a chosen network: pick the preset — **`logos.test`** (Logos Test Network, the default) or **`logos.dev`** (Logos Dev Network) — the node **mode** — `Core` (full relay node) or `Edge` (light node) — and the sender **anonymity level** — `None` (send directly), `Preferred` or `Required`, where anything above `None` mounts mix and routes sends over it; when mix is unusable, `Preferred` sends directly and `Required` fails the send. Once the node is ready the Configuration panel gives way to the Messaging and Reliable Channels panels. `createNode` can be called once per session; to switch fleet/mode, restart the app.
 
 ### RLN
 
