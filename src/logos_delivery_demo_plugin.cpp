@@ -40,6 +40,7 @@ void LogosDeliveryDemoPlugin::initLogos(LogosAPI* api)
     // nodeStarted event: node state is read from the module, never inferred
     // from who called createNode.
     readNodeInfo();
+    readRlnState();
 }
 
 void LogosDeliveryDemoPlugin::wireEvents()
@@ -150,15 +151,8 @@ void LogosDeliveryDemoPlugin::wireEvents()
         // Queued for the same reason as nodeStarted above.
         QMetaObject::invokeMethod(this, [this, state, message, timestamp] {
             qInfo() << "logos_delivery_demo: rln state" << state << message;
-            setRlnState(state);
-            setRlnStateMessage(message);
             emit rlnStateChangedNotif(state, message, timestamp);
-
-            if (state == QStringLiteral("Ready")) {
-                adoptRlnDeployment();
-            } else if (state != QStringLiteral("Initializing")) {
-                setRlnConfigured(false);
-            }
+            applyRlnState(state, message);
         }, Qt::QueuedConnection);
     });
 
@@ -260,6 +254,34 @@ void LogosDeliveryDemoPlugin::pollRlnMembership()
                 setRlnMembershipHash(obj.value(QStringLiteral("membership_hash")).toString());
             }, Qt::QueuedConnection);
         });
+}
+
+// rlnStateChanged fires on transitions only, so an adopted node is read here.
+void LogosDeliveryDemoPlugin::readRlnState()
+{
+    if (!m_logos) return;
+
+    LogosResult state = m_logos->delivery_module.rlnState();
+    if (!state.success) {
+        setLastError(QStringLiteral("rlnState failed: %1").arg(state.getError()));
+        return;
+    }
+
+    const QJsonObject obj = rlnObject(state.value);
+    applyRlnState(obj.value(QStringLiteral("state")).toString(),
+                  obj.value(QStringLiteral("message")).toString());
+}
+
+void LogosDeliveryDemoPlugin::applyRlnState(const QString& state, const QString& message)
+{
+    setRlnState(state);
+    setRlnStateMessage(message);
+
+    if (state == QStringLiteral("Ready")) {
+        adoptRlnDeployment();
+    } else if (state != QStringLiteral("Initializing")) {
+        setRlnConfigured(false);
+    }
 }
 
 // The node's preset owns the RLN deployment, so the scope every rln_module

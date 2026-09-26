@@ -47,6 +47,8 @@ private:
     void readNodeInfo();
     void clearNodeInfo();
 
+    void readRlnState();
+    void applyRlnState(const QString& state, const QString& message);
     void adoptRlnDeployment();
     void startRlnPolling();
     void pollRlnQuota();
