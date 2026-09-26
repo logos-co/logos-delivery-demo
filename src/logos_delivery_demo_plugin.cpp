@@ -387,14 +387,18 @@ void LogosDeliveryDemoPlugin::readNodeInfo()
 {
     if (!m_logos) return;
 
-    // Doubles as the node-exists probe: getNodeInfo fails with "Context not
-    // initialized" until some module has called createNode.
-    LogosResult peer = m_logos->delivery_module.getNodeInfo(QStringLiteral("MyPeerId"));
-    if (!peer.success) {
+    // Fails with "Context not initialized" until some module has called
+    // createNode, and reads "false" for a node created but not started.
+    LogosResult running = m_logos->delivery_module.getNodeInfo(QStringLiteral("IsRunning"));
+    if (!running.success || running.getString() != QStringLiteral("true")) {
         clearNodeInfo();
         return;
     }
-    setPeerId(peer.getString());
+
+    LogosResult peer = m_logos->delivery_module.getNodeInfo(QStringLiteral("MyPeerId"));
+    if (peer.success) {
+        setPeerId(peer.getString());
+    }
 
     // Feeding one of these to another node's entry-node peers them locally.
     LogosResult addrs = m_logos->delivery_module.getNodeInfo(QStringLiteral("MyMultiaddresses"));
@@ -411,6 +415,18 @@ void LogosDeliveryDemoPlugin::readNodeInfo()
     }
 
     setNodeReady(true);
+    readConnectionStatus();
+}
+
+// connectionStateChanged fires on transitions only, so an adopted node is read here.
+void LogosDeliveryDemoPlugin::readConnectionStatus()
+{
+    LogosResult status = m_logos->delivery_module.getConnectionStatus();
+    if (!status.success) {
+        setLastError(QStringLiteral("getConnectionStatus failed: %1").arg(status.getError()));
+        return;
+    }
+    setConnectionStatus(status.getString());
 }
 
 void LogosDeliveryDemoPlugin::clearNodeInfo()

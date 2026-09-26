@@ -46,6 +46,7 @@ private:
     QString startNode(const QString& cfgJson);
     void readNodeInfo();
     void clearNodeInfo();
+    void readConnectionStatus();
 
     void readRlnState();
     void applyRlnState(const QString& state, const QString& message);

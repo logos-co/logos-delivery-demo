@@ -106,7 +106,7 @@ Take that address from the other node's **Multiaddr** in the header. `preset` st
 
 ### Sharing the node with other modules
 
-`delivery_module` is a singleton per Logos Core instance, and so is its node. The demo never assumes it created that node: it reads the node's attributes from the module (`getNodeInfo`) when the view opens and on the `nodeStarted` event, clears them on `nodeStopped`, reads the RLN state (`rlnState()`) when the view opens, and takes everything else from the module's events. So when another module (e.g. the chat module) creates the node, the demo shows it like any other — peer id, version, RLN state and budget, live events — and `createNode` is disabled because the node already exists; the fleet/mode chosen by that module apply.
+`delivery_module` is a singleton per Logos Core instance, and so is its node. The demo never assumes it created that node: it checks the node is running (`getNodeInfo("IsRunning")`) and reads its attributes and connection status (`getConnectionStatus()`) when the view opens and on the `nodeStarted` event, clears them on `nodeStopped`, reads the RLN state (`rlnState()`) when the view opens, and takes everything else from the module's events. So when another module (e.g. the chat module) creates the node, the demo shows it like any other — peer id, version, connection status, RLN state and budget, live events — and `createNode` is disabled because the node already exists; the fleet/mode chosen by that module apply.
 
 The flip side of a shared node: the event log shows *all* of the node's traffic, including other modules', and `unsubscribe` / `channelClose` affect topics and channels other modules opened.
 
