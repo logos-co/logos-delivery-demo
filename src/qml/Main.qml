@@ -536,12 +536,12 @@ Item {
                            + "below the healthy relay threshold (yellow).<br>"
                            + "<code>Disconnected</code> — no usable relay connectivity "
                            + "(red).<br><br>"
-                           + "Until a node exists the badge reads "
+                           + "Until a node is running the badge reads "
                            + "<i>no node — call createNode</i>.<br><br>"
-                           + "The event fires on transitions only, so a node that was "
-                           + "already running when this view opened shows no status until "
-                           + "its next change (logos-delivery-module#81 tracks a queryable "
-                           + "status). Every event is also logged above."
+                           + "The event fires on transitions only, so the current status is "
+                           + "also read with <code>delivery_module.getConnectionStatus()</code> "
+                           + "when this view opens and on <code>nodeStarted</code>. Every "
+                           + "event is also logged above."
                     }
                 }
 
@@ -573,8 +573,8 @@ Item {
                            + "Returned by <code>delivery_module.getNodeInfo(\"MyPeerId\")</code>. "
                            + "Fixed for the life of the node, so it is read once — when this "
                            + "view opens and on the node's <code>nodeStarted</code> event — "
-                           + "rather than polled. That read is also what tells the demo "
-                           + "whether a node exists at all, whichever module created it."
+                           + "rather than polled. Whether a node is running at all, "
+                           + "whichever module created it, is <code>getNodeInfo(\"IsRunning\")</code>."
                     }
 
                     Item { Layout.fillWidth: true }
