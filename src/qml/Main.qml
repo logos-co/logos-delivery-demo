@@ -527,21 +527,19 @@ Item {
                              :                                               Theme.palette.textSecondary
                     }
                     InfoChip {
-                        tip: "<b>Connection status</b> — the node's health, surfaced from "
-                           + "<code>delivery_module</code>'s <code>connectionStateChanged</code> "
-                           + "event. Possible states:<br><br>"
+                        tip: "<b>Connection status</b> — the node's relay connectivity.<br><br>"
                            + "<code>Connected</code> — healthy relay connectivity "
                            + "(green).<br>"
                            + "<code>PartiallyConnected</code> — connected to some peers but "
                            + "below the healthy relay threshold (yellow).<br>"
                            + "<code>Disconnected</code> — no usable relay connectivity "
                            + "(red).<br><br>"
+                           + "Read with <code>delivery_module.getConnectionStatus()</code> "
+                           + "when this view opens and on <code>nodeStarted</code>, then kept "
+                           + "current by the <code>connectionStateChanged</code> event, which "
+                           + "is logged above.<br><br>"
                            + "Until a node is running the badge reads "
-                           + "<i>no node — call createNode</i>.<br><br>"
-                           + "The event fires on transitions only, so the current status is "
-                           + "also read with <code>delivery_module.getConnectionStatus()</code> "
-                           + "when this view opens and on <code>nodeStarted</code>. Every "
-                           + "event is also logged above."
+                           + "<i>no node — call createNode</i>."
                     }
                 }
 
