@@ -4473,17 +4473,17 @@
         "nix-bundle-lgx": "nix-bundle-lgx_322"
       },
       "locked": {
-        "lastModified": 1790543293,
+        "lastModified": 1790589967,
         "narHash": "sha256-4p4YGpseRktrAR3HHzLaC2Mp/IkyD5DMhY619z130qs=",
         "owner": "logos-co",
         "repo": "logos-delivery-module",
-        "rev": "6cadc1a0d4b636f16afa534f6d3cd4ed8aa8b38c",
+        "rev": "0cdab000e0bb50419b0e801d81ef09e5a3b4ee49",
         "type": "github"
       },
       "original": {
         "owner": "logos-co",
         "repo": "logos-delivery-module",
-        "rev": "6cadc1a0d4b636f16afa534f6d3cd4ed8aa8b38c",
+        "rev": "0cdab000e0bb50419b0e801d81ef09e5a3b4ee49",
         "type": "github"
       }
     },
