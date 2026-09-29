@@ -8,7 +8,7 @@ import Logos.Controls
 Item {
     id: root
 
-    readonly property var backend: logos.module("logos_delivery_demo")
+    readonly property var backend: logos.module("delivery_demo")
 
     // Monospace family for code-like values (peer ids, hashes, topics,
     // payloads, request ids, timestamps, method signatures). The design system

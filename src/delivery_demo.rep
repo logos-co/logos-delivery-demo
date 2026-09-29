@@ -1,4 +1,4 @@
-class LogosDeliveryDemo
+class DeliveryDemo
 {
     PROP(QString connectionStatus="initializing" READONLY)
     PROP(bool nodeReady=false READONLY)

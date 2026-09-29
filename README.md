@@ -38,13 +38,13 @@ nix run
 
 # Package as an installable .lgx
 nix build .#lgx
-# → ./result/logos-logos_delivery_demo-module.lgx
+# → ./result/logos-delivery_demo-module.lgx
 ```
 
 Install the `.lgx` into a Logos host (e.g. `logos-basecamp` or `logoscore`):
 
 ```bash
-lgpm install ./result/logos-logos_delivery_demo-module.lgx --to ./modules
+lgpm install ./result/logos-delivery_demo-module.lgx --to ./modules
 ```
 
 ## Repository layout
@@ -55,15 +55,15 @@ logos-delivery-demo/
 ├── metadata.json                        # type: ui_qml, deps: [delivery_module]
 ├── CMakeLists.txt
 └── src/
-    ├── logos_delivery_demo.rep          # Qt Remote Objects contract
-    ├── logos_delivery_demo_interface.h  # plugin interface (discovery)
-    ├── logos_delivery_demo_plugin.h     # C++ backend
-    ├── logos_delivery_demo_plugin.cpp   # wires delivery_module events → QML, exposes slots
+    ├── delivery_demo.rep                # Qt Remote Objects contract
+    ├── delivery_demo_interface.h        # plugin interface (discovery)
+    ├── delivery_demo_plugin.h           # C++ backend
+    ├── delivery_demo_plugin.cpp         # wires delivery_module events → QML, exposes slots
     └── qml/
         └── Main.qml                     # the UI
 ```
 
-The C++ backend lives in the `ui-host` process; the QML view runs in the host application. They communicate over Qt Remote Objects (auto-generated from `logos_delivery_demo.rep`).
+The C++ backend lives in the `ui-host` process; the QML view runs in the host application. They communicate over Qt Remote Objects (auto-generated from `delivery_demo.rep`).
 
 ## Network
 

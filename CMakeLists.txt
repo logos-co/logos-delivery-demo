@@ -8,10 +8,10 @@ else()
 endif()
 
 logos_module(
-    NAME logos_delivery_demo
-    REP_FILE src/logos_delivery_demo.rep
+    NAME delivery_demo
+    REP_FILE src/delivery_demo.rep
     SOURCES
-        src/logos_delivery_demo_interface.h
-        src/logos_delivery_demo_plugin.h
-        src/logos_delivery_demo_plugin.cpp
+        src/delivery_demo_interface.h
+        src/delivery_demo_plugin.h
+        src/delivery_demo_plugin.cpp
 )
