@@ -1,11 +1,11 @@
 {
-  "name": "logos_delivery_demo",
+  "name": "delivery_demo",
   "display_name": "Delivery Demo",
   "version": "0.3.0",
   "type": "ui_qml",
   "category": "messaging",
   "description": "Educational UI demo for logos-delivery-module: subscribe to content topics, send and receive messages, see which delivery_module API calls back each interaction.",
-  "main": "logos_delivery_demo_plugin",
+  "main": "delivery_demo_plugin",
   "view": "qml/Main.qml",
   "icon": "src/icons/mail.png",
   "dependencies": ["delivery_module", "liblogos_rln_module"],
