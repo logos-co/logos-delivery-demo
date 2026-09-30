@@ -39,8 +39,25 @@ void DeliveryDemoPlugin::initLogos(LogosAPI* api)
     // possibly before this module loaded. Hence the read here, not just on the
     // nodeStarted event: node state is read from the module, never inferred
     // from who called createNode.
-    readNodeInfo();
-    readRlnState();
+    // Re-read until settled: an adopted node's transitions have already fired.
+    m_adoptTimer = new QTimer(this);
+    m_adoptTimer->setInterval(2000);
+    connect(m_adoptTimer, &QTimer::timeout, this, &DeliveryDemoPlugin::settleAdoptedNode);
+    m_adoptTimer->start();
+    settleAdoptedNode();
+}
+
+void DeliveryDemoPlugin::settleAdoptedNode()
+{
+    if (!nodeReady()) readNodeInfo();
+    if (!rlnConfigured()) readRlnState();
+
+    const QString state = rlnState();
+    if (nodeReady()
+        && (rlnConfigured() || state == QStringLiteral("Disabled")
+            || state == QStringLiteral("Failed"))) {
+        m_adoptTimer->stop();
+    }
 }
 
 void DeliveryDemoPlugin::wireEvents()

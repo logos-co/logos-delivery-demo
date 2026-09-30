@@ -48,6 +48,7 @@ private:
     void clearNodeInfo();
     void readConnectionStatus();
 
+    void settleAdoptedNode();
     void readRlnState();
     void applyRlnState(const QString& state, const QString& message);
     void adoptRlnDeployment();
@@ -62,6 +63,7 @@ private:
     QString m_rlnIdentifier;
     QTimer* m_rlnQuotaTimer = nullptr;
     QTimer* m_rlnMembershipTimer = nullptr;
+    QTimer* m_adoptTimer = nullptr;
 };
 
 #endif // DELIVERY_DEMO_PLUGIN_H
