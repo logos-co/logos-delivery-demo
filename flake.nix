@@ -17,14 +17,14 @@
     # follows keeps the module on our builder: emitter and consumer must agree
     # on the binary event wire form.
     delivery_module = {
-      url = "github:logos-co/logos-delivery-module/0cdab000e0bb50419b0e801d81ef09e5a3b4ee49";
+      url = "github:logos-co/logos-delivery-module/v0.3.0";
       inputs.logos-module-builder.follows = "logos-module-builder";
       inputs.liblogos_rln_module.follows = "liblogos_rln_module";
     };
     # The demo reads RLN state itself, so it needs its own generated client:
     # the builder resolves a declared dependency only from a same-named input.
     # delivery_module follows this one — two instances would bundle twice.
-    liblogos_rln_module.url = "git+https://github.com/logos-co/logos-rln-modules?ref=main&rev=65697028baffc072e1aeebaec7c7e35e7e12cab1&dir=logos-rln-module";
+    liblogos_rln_module.url = "git+https://github.com/logos-co/logos-rln-modules?ref=main&rev=25357cfd877ba18d6e0880564b8fd7ba0abf2d70&dir=logos-rln-module";
   };
 
   outputs = inputs@{ logos-module-builder, ... }:
