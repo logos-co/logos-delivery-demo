@@ -6,7 +6,7 @@ A small `ui_qml` module that demonstrates **how an application uses [`logos-deli
 
 This repo is the runnable companion to the journey doc [**Use the Logos Delivery module API from an app**](https://github.com/logos-co/logos-docs/blob/main/docs/messaging/journeys/use-the-logos-delivery-module-api-from-an-app.md) — every code path in the doc is exercised here, and every interactive control has an info button explaining which `delivery_module` API call it triggers.
 
-Pinned to `logos-delivery-module` [**`v0.2.0`**](https://github.com/logos-co/logos-delivery-module/tree/v0.2.0).
+Pinned to `logos-delivery-module` [**`v0.3.0`**](https://github.com/logos-co/logos-delivery-module/tree/v0.3.0).
 
 ![Screenshot of the demo running on logos.dev](docs/screenshot.png)
 
@@ -16,12 +16,12 @@ Pinned to `logos-delivery-module` [**`v0.2.0`**](https://github.com/logos-co/log
 - Constructing the typed `LogosModules` wrapper from `LogosAPI*` in `initLogos`
 - Bootstrapping the node from the UI with `createNode(...)` and `start()`, with `LogosResult` checks — the fleet (`logos.test` / `logos.dev`, defaulting to `logos.test`), node mode (`Core` / `Edge`) and sender anonymity level (`None` / `Preferred` / `Required`) are picked from dropdowns
 - An **advanced** toggle that swaps those dropdowns for the raw `createNode` config, so the parts the dropdowns don't reach are still reachable — `entry-node` to peer with a local node instead of a fleet, `cluster-id`, ports, or a lower `entryLayer`. The config passes through to logos-delivery verbatim; the demo only checks it is well-formed JSON
-- Turning RLN on for that node with `configureRln(registryId, rlnIdentifier, epochSizeSec)` — a `delivery_module` method of its own, called *before* `createNode`, because the delivery library's RLN plugin names no registry and carries no config
+- Following RLN bring-up with `rlnState()` and `rlnStateChanged` — the preset given to `createNode` decides whether RLN is on and which deployment it uses, so there is nothing to configure
 - Reading the node's fixed attributes through `getNodeInfo` — `MyPeerId`, `MyMultiaddresses` and the `logos-delivery` library `Version`. They are constant for the life of the node, so they are read once (when the view opens and on `nodeStarted`) rather than polled
 - Surfacing `connectionStateChanged` as a live status badge
 - The **Reliable Channels API**: `channelCreate(channelId, contentTopic, senderId)` / `channelExists` / `channelSend` / `channelClose`, with the `channelMessageReceived` / `channelMessageSent` / `channelMessageError` events surfaced in the event log
 - A **global event log** that renders every observed event verbatim — `messageReceived`, `messageSent`, `messagePropagated`, `messageError`, `channelMessageReceived`, `channelMessageSent`, `channelMessageError`, plus the local return values of every playground call — colour-coded by event kind, with every field selectable so you can copy hashes, topics, payloads, request ids
-- A **method-call playground** at the bottom: one card per public `delivery_module` API call, rendered as `methodName(arg…)` with a `Call` button — every interaction is reflected as a row in the event log above. It follows the node's two phases: while there is no node it shows the **RLN** and **Configuration** panels, and once the node is up it swaps Configuration for the API panels — **Messaging** (`subscribe`, `unsubscribe`, `send`) and **Reliable Channels** (`channelCreate`, `channelExists`, `channelSend`, `channelClose`) side by side. The **RLN** panel sits above them across both phases: it carries `configureRln` until that call lands, then shows the membership state and epoch budget live. `createNode`'s three arguments are fixed-choice enums picked from dropdowns, unless **Advanced config** in the Configuration panel's title bar swaps them for the raw config; message payloads are raw **bytes**: a global **Payload format** dropdown in the header switches between **HEX** and **UTF-8** for both payload entry and how payloads render in the event log (switching re-renders payloads already logged)
+- A **method-call playground** at the bottom: one card per public `delivery_module` API call, rendered as `methodName(arg…)` with a `Call` button — every interaction is reflected as a row in the event log above. It follows the node's two phases: while there is no node it shows the **RLN** and **Configuration** panels, and once the node is up it swaps Configuration for the API panels — **Messaging** (`subscribe`, `unsubscribe`, `send`) and **Reliable Channels** (`channelCreate`, `channelExists`, `channelSend`, `channelClose`) side by side. The **RLN** panel sits above them across both phases: it shows RLN's bring-up state until RLN is `Ready`, then the membership state and epoch budget live. `createNode`'s three arguments are fixed-choice enums picked from dropdowns, unless **Advanced config** in the Configuration panel's title bar swaps them for the raw config; message payloads are raw **bytes**: a global **Payload format** dropdown in the header switches between **HEX** and **UTF-8** for both payload entry and how payloads render in the event log (switching re-renders payloads already logged)
 - An info `?` chip next to every interactive element with a tooltip spelling out the exact `delivery_module` call behind it — the demo doubles as live API documentation
 - Using **[`Logos.Theme`](https://github.com/logos-co/logos-design-system) and `Logos.Controls`** for tokens, colors, and themed components — no hard-coded styling in the demo
 
@@ -71,19 +71,13 @@ The node is **not** started automatically. On start-up the playground shows only
 
 ### RLN
 
-To bring the node up with RLN on, call `configureRln` **before** `createNode` — the row in the **RLN** panel, above Configuration, so the panels read in call order. All three arguments come prefilled with this demo's defaults:
+RLN has no method to call: the `preset` given to `createNode` selects the registry, the application identifier and the epoch size together, since every node of a deployment must agree on all three. **`logos.test`** runs with RLN on; **`logos.dev`** runs with it off. A deployment of your own supplies its table through `delivery_module`'s `LOGOS_DELIVERY_RLN_PRESETS` file.
 
-| argument | default | what it is |
-| --- | --- | --- |
-| `registryId` | `logos:testnet:ffa111d7…a219` | CAIP-10 account id of the registry deployment. In the `logos` namespace the account is the registration program's config PDA, and must be the full 64 hex characters — a short form like `logos:testnet:0` is rejected. This is the deployed testnet registry, the same one the RLN membership UI registers against. |
-| `rlnIdentifier` | `3a1ae1c9…f824` | The application id, exactly 64 hex characters (32 bytes) — here `sha256("logos-delivery-demo")`. It is bound into every proof's external nullifier, so nodes only validate each other's proofs when they share it. |
-| `epochSizeSec` | `120` | The application's rate-limit epoch. **Required** — `liblogos_rln_module.start()` rejects a config without it, and every proof generator and verifier of a deployment must agree on the value. |
-
-RLN never rides the `createNode` config: the delivery library asks an external RLN module for every RLN operation and its plugin names no registry, so the module is the only place a membership is named — and installing that plugin is what makes the library mount RLN, which it reads at node creation. Without the call the node comes up with RLN off. The node's membership must already be active; registration happens out of band, through the RLN module, and `createNode` fails at start without one.
+With RLN on, the node needs `liblogos_rln_module` and `liblogos_lez_rln_module` installed and an active membership, or it fails at `start`. Registration happens out of band, in the RLN membership UI — never through this demo.
 
 #### The RLN panel
 
-Once `configureRln` succeeds the method gives way to the live figures, which stay for the rest of the session, on both sides of `createNode`. The panel reads `liblogos_rln_module` directly — the demo declares it as a dependency of its own, alongside `delivery_module`, so it gets a generated client for it:
+The panel follows `rlnState` — `Disabled`, `Initializing`, `Ready` or `Failed`. Once RLN is `Ready` it reads the node's registry, identifier and epoch size back from `rlnState` and gives way to the live figures, which stay for the rest of the session. The figures come from `liblogos_rln_module` directly — the demo declares it as a dependency of its own, alongside `delivery_module`, so it gets a generated client for it:
 
 - **Membership** — `get_membership_state(registryId, rlnIdentifier)`, re-read every 10 s and immediately on the module's `membership_state_changed` push. `active` and `grace_period` can generate proofs; `pending` is a submitted registration still confirming; `unknown` means nothing resolves for the scope and `createNode` will fail at start.
 - **Messages left this epoch** — `get_epoch_quota(registryId, rlnIdentifier, timestamp)`, polled every 2 s and again on every proof the node generates. This is the budget still unspent over the membership's rate limit. The read is purely local and advisory: `generate_proof` remains the allocation authority, so a send can still fail `budget_exhausted` if the budget went between the read and the proof. A rate limit of `0` always means no usable membership rather than an exhausted budget.
@@ -130,7 +124,7 @@ The demo specifies no ports, and its layered config gets ephemeral p2p ports fro
 ## References
 
 - [Journey doc — Use the Logos Delivery module API from an app](https://github.com/logos-co/logos-docs/blob/main/docs/messaging/journeys/use-the-logos-delivery-module-api-from-an-app.md)
-- [`logos-delivery-module` @ v0.2.0](https://github.com/logos-co/logos-delivery-module/tree/v0.2.0) — the module this demo drives
+- [`logos-delivery-module` @ v0.3.0](https://github.com/logos-co/logos-delivery-module/tree/v0.3.0) — the module this demo drives
 - [`logos-module-builder` — the Nix flake library this demo builds with](https://github.com/logos-co/logos-module-builder)
 - [Logos module developer guide](https://github.com/logos-co/logos-tutorial/blob/master/logos-developer-guide.md) — full walkthrough of module dev, `LogosResult`, generated wrappers
 - [LIP-23 — content topic format](https://lip.logos.co/messaging/informational/23/topics.html)
