@@ -1,32 +1,28 @@
-#ifndef DELIVERY_DEMO_PLUGIN_H
-#define DELIVERY_DEMO_PLUGIN_H
+#ifndef DELIVERY_DEMO_BACKEND_H
+#define DELIVERY_DEMO_BACKEND_H
 
 #include <QString>
-#include <QVariantList>
 #include <QTimer>
-#include "delivery_demo_interface.h"
-#include "LogosViewPluginBase.h"
+#include "logos_ui_plugin_context.h"
 #include "rep_delivery_demo_source.h"
 
-class LogosAPI;
-class LogosModules;
-
-class DeliveryDemoPlugin : public DeliveryDemoSimpleSource,
-                                public DeliveryDemoInterface,
-                                public DeliveryDemoViewPluginBase
+// View backend for the delivery demo. Derives the repc SimpleSource (the
+// contract QML's replica binds to) plus LogosUiPluginContext, which supplies
+// onContextReady() and the typed modules() accessor to the dependencies
+// declared in metadata.json. The Q_PLUGIN_METADATA/initLogos plumbing that
+// used to live here is generated now (delivery_demo_ui_glue.*).
+class DeliveryDemoBackend : public DeliveryDemoSimpleSource,
+                            public LogosUiPluginContext
 {
     Q_OBJECT
-    Q_PLUGIN_METADATA(IID DeliveryDemoInterface_iid FILE "metadata.json")
-    Q_INTERFACES(DeliveryDemoInterface)
 
 public:
-    explicit DeliveryDemoPlugin(QObject* parent = nullptr);
-    ~DeliveryDemoPlugin() override;
+    explicit DeliveryDemoBackend(QObject* parent = nullptr);
+    ~DeliveryDemoBackend() override;
 
-    QString name()    const override { return "delivery_demo"; }
-    QString version() const override { return "0.1.0"; }
-
-    Q_INVOKABLE void initLogos(LogosAPI* api);
+    // Fires once the generated plugin glue has wired modules(); the typed
+    // dependency surface is live, so event subscriptions happen here.
+    void onContextReady() override;
 
     QString createNode(QString preset, QString mode, QString anonymityLevel) override;
     QString createNodeWithConfig(QString configJson) override;
@@ -37,9 +33,6 @@ public:
     QString channelExists(QString channelId) override;
     QString channelSend(QString channelId, QString payloadHex) override;
     QString channelClose(QString channelId) override;
-
-signals:
-    void eventResponse(const QString& eventName, const QVariantList& args);
 
 private:
     void wireEvents();
@@ -55,13 +48,10 @@ private:
     void pollRlnQuota();
     void pollRlnMembership();
 
-    LogosAPI* m_logosAPI = nullptr;
-    LogosModules* m_logos = nullptr;
-
     QString m_rlnRegistryId;
     QString m_rlnIdentifier;
     QTimer* m_rlnQuotaTimer = nullptr;
     QTimer* m_rlnMembershipTimer = nullptr;
 };
 
-#endif // DELIVERY_DEMO_PLUGIN_H
+#endif // DELIVERY_DEMO_BACKEND_H
