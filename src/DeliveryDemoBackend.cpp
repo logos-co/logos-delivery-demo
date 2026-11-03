@@ -1,5 +1,8 @@
-#include "delivery_demo_plugin.h"
-#include "logos_api.h"
+#include "DeliveryDemoBackend.h"
+
+// Generated umbrella: LogosModules (behind modules()) from
+// metadata.json#dependencies — the Qt-typed delivery_module and
+// liblogos_rln_module wrappers.
 #include "logos_sdk.h"
 #include "logos_types.h"
 
@@ -10,24 +13,18 @@
 #include <QJsonParseError>
 #include <QMetaObject>
 
-DeliveryDemoPlugin::DeliveryDemoPlugin(QObject* parent)
+DeliveryDemoBackend::DeliveryDemoBackend(QObject* parent)
     : DeliveryDemoSimpleSource(parent)
 {
 }
 
-DeliveryDemoPlugin::~DeliveryDemoPlugin()
+DeliveryDemoBackend::~DeliveryDemoBackend() = default;
+
+void DeliveryDemoBackend::onContextReady()
 {
-    delete m_logos;
-}
-
-void DeliveryDemoPlugin::initLogos(LogosAPI* api)
-{
-    if (m_logos) return;
-    m_logosAPI = api;
-    m_logos = new LogosModules(api);
-
-    setBackend(this);
-
+    // Fires after the generated glue has wired modules(), so the typed
+    // dependency surface is live — the right point to arm the event
+    // subscriptions.
     wireEvents();
 
     // The node is no longer bootstrapped automatically — the UI drives it by
@@ -43,9 +40,9 @@ void DeliveryDemoPlugin::initLogos(LogosAPI* api)
     readRlnState();
 }
 
-void DeliveryDemoPlugin::wireEvents()
+void DeliveryDemoBackend::wireEvents()
 {
-    m_logos->delivery_module.on("connectionStateChanged", [this](const QVariantList& data) {
+    modules().delivery_module.on("connectionStateChanged", [this](const QVariantList& data) {
         if (data.size() < 2) return;
         setConnectionStatus(data.at(0).toString());
         emit connectionStateChangedNotif(data.at(0).toString(), data.at(1).toLongLong());
@@ -54,7 +51,7 @@ void DeliveryDemoPlugin::wireEvents()
     // The node's lifecycle events. They fire regardless of which module drove
     // the call, so on a shared node these are also how the demo sees another
     // module's start / stop.
-    m_logos->delivery_module.on("nodeStarted", [this](const QVariantList& data) {
+    modules().delivery_module.on("nodeStarted", [this](const QVariantList& data) {
         if (data.size() < 3) return;
         emit nodeStartedNotif(data.at(0).toBool(), data.at(1).toString(), data.at(2).toLongLong());
         // Queued, not called inline: event callbacks arrive on delivery_module's
@@ -65,13 +62,13 @@ void DeliveryDemoPlugin::wireEvents()
         QMetaObject::invokeMethod(this, [this] { readNodeInfo(); }, Qt::QueuedConnection);
     });
 
-    m_logos->delivery_module.on("nodeStopped", [this](const QVariantList& data) {
+    modules().delivery_module.on("nodeStopped", [this](const QVariantList& data) {
         if (data.size() < 3) return;
         emit nodeStoppedNotif(data.at(0).toBool(), data.at(1).toString(), data.at(2).toLongLong());
         QMetaObject::invokeMethod(this, [this] { clearNodeInfo(); }, Qt::QueuedConnection);
     });
 
-    m_logos->delivery_module.on("messageReceived", [this](const QVariantList& data) {
+    modules().delivery_module.on("messageReceived", [this](const QVariantList& data) {
         if (data.size() < 5) return;
         // data[2] is the message payload — arbitrary bytes, not text. Surface it
         // as a space-separated hex string so the UI shows it as bytes.
@@ -90,22 +87,22 @@ void DeliveryDemoPlugin::wireEvents()
             data.at(4).toLongLong());                    // timestamp (qint64, ns since epoch)
     });
 
-    m_logos->delivery_module.on("messageSent", [this](const QVariantList& data) {
+    modules().delivery_module.on("messageSent", [this](const QVariantList& data) {
         if (data.size() < 3) return;
         emit messageSentNotif(data.at(0).toString(), data.at(1).toString(), data.at(2).toLongLong());
     });
 
-    m_logos->delivery_module.on("messagePropagated", [this](const QVariantList& data) {
+    modules().delivery_module.on("messagePropagated", [this](const QVariantList& data) {
         if (data.size() < 3) return;
         emit messagePropagatedNotif(data.at(0).toString(), data.at(1).toString(), data.at(2).toLongLong());
     });
 
-    m_logos->delivery_module.on("messageError", [this](const QVariantList& data) {
+    modules().delivery_module.on("messageError", [this](const QVariantList& data) {
         if (data.size() < 4) return;
         emit messageErrorNotif(data.at(0).toString(), data.at(1).toString(), data.at(2).toString(), data.at(3).toLongLong());
     });
 
-    m_logos->delivery_module.on("channelMessageReceived", [this](const QVariantList& data) {
+    modules().delivery_module.on("channelMessageReceived", [this](const QVariantList& data) {
         if (data.size() < 4) return;
         const QByteArray payload = data.at(2).toByteArray();
         emit channelMessageReceived(
@@ -115,12 +112,12 @@ void DeliveryDemoPlugin::wireEvents()
             data.at(3).toLongLong());                    // timestamp (qint64, ns since epoch)
     });
 
-    m_logos->delivery_module.on("channelMessageSent", [this](const QVariantList& data) {
+    modules().delivery_module.on("channelMessageSent", [this](const QVariantList& data) {
         if (data.size() < 3) return;
         emit channelMessageSentNotif(data.at(0).toString(), data.at(1).toString(), data.at(2).toLongLong());
     });
 
-    m_logos->delivery_module.on("channelMessageError", [this](const QVariantList& data) {
+    modules().delivery_module.on("channelMessageError", [this](const QVariantList& data) {
         if (data.size() < 4) return;
         emit channelMessageErrorNotif(data.at(0).toString(), data.at(1).toString(), data.at(2).toString(), data.at(3).toLongLong());
     });
@@ -128,13 +125,13 @@ void DeliveryDemoPlugin::wireEvents()
     // The delivery library asks for one proof per outbound message and one
     // validation per inbound one, so these are the node's live RLN traffic.
     // They keep firing even though the in-process bridge answers them.
-    m_logos->delivery_module.on("dispatchRlnGenerateProofRequestEvent", [this](const QVariantList& data) {
+    modules().delivery_module.on("dispatchRlnGenerateProofRequestEvent", [this](const QVariantList& data) {
         if (data.size() < 6) return;
         setRlnProofs(rlnProofs() + 1);
         emit rlnProofRequested(data.at(3).toString(), data.at(4).toLongLong(), data.at(5).toLongLong());
         pollRlnQuota();
     });
-    m_logos->delivery_module.on("dispatchRlnValidateProofRequestEvent", [this](const QVariantList& data) {
+    modules().delivery_module.on("dispatchRlnValidateProofRequestEvent", [this](const QVariantList& data) {
         if (data.size() < 7) return;
         setRlnValidations(rlnValidations() + 1);
         emit rlnValidationRequested(data.at(3).toString(), data.at(4).toLongLong(), data.at(6).toLongLong());
@@ -143,7 +140,7 @@ void DeliveryDemoPlugin::wireEvents()
     // RLN is not configured from here any more: the node's network preset
     // decides whether it runs, and delivery_module reports the bring-up it
     // then does on its own thread.
-    m_logos->delivery_module.on("rlnStateChanged", [this](const QVariantList& data) {
+    modules().delivery_module.on("rlnStateChanged", [this](const QVariantList& data) {
         if (data.size() < 3) return;
         const QString state = data.at(0).toString();
         const QString message = data.at(1).toString();
@@ -158,7 +155,7 @@ void DeliveryDemoPlugin::wireEvents()
 
     // A push from the RLN module's confirmation poller. get_membership_state
     // stays the authority, so this only wakes an immediate re-read.
-    m_logos->liblogos_rln_module.onMembership_state_changed(
+    modules().liblogos_rln_module.onMembership_state_changed(
         [this](const QString& registryId, const QString& rlnIdentifier,
                const QString& membershipHash, const QString& state, const QString& previous) {
             if (registryId != m_rlnRegistryId) return;
@@ -190,7 +187,7 @@ static QString rlnInBandError(const QJsonObject& obj)
              err.value(QStringLiteral("message")).toString());
 }
 
-void DeliveryDemoPlugin::startRlnPolling()
+void DeliveryDemoBackend::startRlnPolling()
 {
     if (m_rlnQuotaTimer) return;
 
@@ -199,26 +196,26 @@ void DeliveryDemoPlugin::startRlnPolling()
     // membership UI polls at.
     m_rlnQuotaTimer = new QTimer(this);
     m_rlnQuotaTimer->setInterval(2000);
-    connect(m_rlnQuotaTimer, &QTimer::timeout, this, &DeliveryDemoPlugin::pollRlnQuota);
+    connect(m_rlnQuotaTimer, &QTimer::timeout, this, &DeliveryDemoBackend::pollRlnQuota);
     m_rlnQuotaTimer->start();
 
     m_rlnMembershipTimer = new QTimer(this);
     m_rlnMembershipTimer->setInterval(10000);
-    connect(m_rlnMembershipTimer, &QTimer::timeout, this, &DeliveryDemoPlugin::pollRlnMembership);
+    connect(m_rlnMembershipTimer, &QTimer::timeout, this, &DeliveryDemoBackend::pollRlnMembership);
     m_rlnMembershipTimer->start();
 
     pollRlnQuota();
     pollRlnMembership();
 }
 
-void DeliveryDemoPlugin::pollRlnQuota()
+void DeliveryDemoBackend::pollRlnQuota()
 {
-    if (!m_logos || m_rlnRegistryId.isEmpty()) return;
+    if (!isContextReady() || m_rlnRegistryId.isEmpty()) return;
 
     // The same clock reading a send would stamp on its message: the epoch is
     // derived from the timestamp, not from the module's own clock.
     const QString now = QString::number(QDateTime::currentSecsSinceEpoch());
-    m_logos->liblogos_rln_module.get_epoch_quotaAsync(
+    modules().liblogos_rln_module.get_epoch_quotaAsync(
         m_rlnRegistryId, m_rlnIdentifier, now, [this](LogosResult result) {
             QMetaObject::invokeMethod(this, [this, result]() {
                 if (!result.success) {
@@ -236,11 +233,11 @@ void DeliveryDemoPlugin::pollRlnQuota()
         });
 }
 
-void DeliveryDemoPlugin::pollRlnMembership()
+void DeliveryDemoBackend::pollRlnMembership()
 {
-    if (!m_logos || m_rlnRegistryId.isEmpty()) return;
+    if (!isContextReady() || m_rlnRegistryId.isEmpty()) return;
 
-    m_logos->liblogos_rln_module.get_membership_stateAsync(
+    modules().liblogos_rln_module.get_membership_stateAsync(
         m_rlnRegistryId, m_rlnIdentifier, [this](QString reply) {
             QMetaObject::invokeMethod(this, [this, reply]() {
                 const QJsonObject obj = QJsonDocument::fromJson(reply.toUtf8()).object();
@@ -257,11 +254,11 @@ void DeliveryDemoPlugin::pollRlnMembership()
 }
 
 // rlnStateChanged fires on transitions only, so an adopted node is read here.
-void DeliveryDemoPlugin::readRlnState()
+void DeliveryDemoBackend::readRlnState()
 {
-    if (!m_logos) return;
+    if (!isContextReady()) return;
 
-    LogosResult state = m_logos->delivery_module.rlnState();
+    LogosResult state = modules().delivery_module.rlnState();
     if (!state.success) {
         setLastError(QStringLiteral("rlnState failed: %1").arg(state.getError()));
         return;
@@ -272,7 +269,7 @@ void DeliveryDemoPlugin::readRlnState()
                   obj.value(QStringLiteral("message")).toString());
 }
 
-void DeliveryDemoPlugin::applyRlnState(const QString& state, const QString& message)
+void DeliveryDemoBackend::applyRlnState(const QString& state, const QString& message)
 {
     setRlnState(state);
     setRlnStateMessage(message);
@@ -286,11 +283,11 @@ void DeliveryDemoPlugin::applyRlnState(const QString& state, const QString& mess
 
 // The node's preset owns the RLN deployment, so the scope every rln_module
 // call needs is read back from delivery_module rather than held here.
-void DeliveryDemoPlugin::adoptRlnDeployment()
+void DeliveryDemoBackend::adoptRlnDeployment()
 {
-    if (!m_logos) return;
+    if (!isContextReady()) return;
 
-    LogosResult state = m_logos->delivery_module.rlnState();
+    LogosResult state = modules().delivery_module.rlnState();
     if (!state.success) {
         setLastError(QStringLiteral("rlnState failed: %1").arg(state.getError()));
         return;
@@ -310,7 +307,7 @@ void DeliveryDemoPlugin::adoptRlnDeployment()
     startRlnPolling();
 }
 
-QString DeliveryDemoPlugin::createNode(QString preset, QString mode, QString anonymityLevel)
+QString DeliveryDemoBackend::createNode(QString preset, QString mode, QString anonymityLevel)
 {
     // No port config: the layered shape gets ephemeral p2p ports (logos-delivery
     // defaults them to 0), so two demo instances on one machine don't collide.
@@ -330,7 +327,7 @@ QString DeliveryDemoPlugin::createNode(QString preset, QString mode, QString ano
     return startNode(QString::fromUtf8(QJsonDocument(cfg).toJson(QJsonDocument::Compact)));
 }
 
-QString DeliveryDemoPlugin::createNodeWithConfig(QString configJson)
+QString DeliveryDemoBackend::createNodeWithConfig(QString configJson)
 {
     const QString cfgJson = configJson.trimmed();
     if (cfgJson.isEmpty()) return QStringLiteral("Config is empty");
@@ -351,14 +348,14 @@ QString DeliveryDemoPlugin::createNodeWithConfig(QString configJson)
 
 // Both entry points end here: logos-delivery owns the config grammar, so the
 // JSON crosses the FFI boundary verbatim either way.
-QString DeliveryDemoPlugin::startNode(const QString& cfgJson)
+QString DeliveryDemoBackend::startNode(const QString& cfgJson)
 {
-    if (!m_logos) return QStringLiteral("Backend not initialised");
+    if (!isContextReady()) return QStringLiteral("Backend not initialised");
     if (nodeReady()) return QStringLiteral("Node already created");
 
     qInfo() << "delivery_demo: createNode" << cfgJson;
 
-    LogosResult create = m_logos->delivery_module.createNode(cfgJson);
+    LogosResult create = modules().delivery_module.createNode(cfgJson);
     if (!create.success) {
         setLastError(QStringLiteral("createNode failed: %1").arg(create.getError()));
         return create.getError();
@@ -366,7 +363,7 @@ QString DeliveryDemoPlugin::startNode(const QString& cfgJson)
 
     qInfo() << "delivery_demo: createNode succeeded, starting node...";
 
-    LogosResult started = m_logos->delivery_module.start();
+    LogosResult started = modules().delivery_module.start();
     if (!started.success) {
         setLastError(QStringLiteral("start failed: %1").arg(started.getError()));
         return started.getError();
@@ -383,25 +380,25 @@ QString DeliveryDemoPlugin::startNode(const QString& cfgJson)
 // of liblogosdelivery — so they are read once per node rather than polled: at
 // init (the node may already exist, created by another module) and on
 // nodeStarted.
-void DeliveryDemoPlugin::readNodeInfo()
+void DeliveryDemoBackend::readNodeInfo()
 {
-    if (!m_logos) return;
+    if (!isContextReady()) return;
 
     // Fails with "Context not initialized" until some module has called
     // createNode, and reads "false" for a node created but not started.
-    LogosResult running = m_logos->delivery_module.getNodeInfo(QStringLiteral("IsRunning"));
+    LogosResult running = modules().delivery_module.getNodeInfo(QStringLiteral("IsRunning"));
     if (!running.success || running.getString() != QStringLiteral("true")) {
         clearNodeInfo();
         return;
     }
 
-    LogosResult peer = m_logos->delivery_module.getNodeInfo(QStringLiteral("MyPeerId"));
+    LogosResult peer = modules().delivery_module.getNodeInfo(QStringLiteral("MyPeerId"));
     if (peer.success) {
         setPeerId(peer.getString());
     }
 
     // Feeding one of these to another node's entry-node peers them locally.
-    LogosResult addrs = m_logos->delivery_module.getNodeInfo(QStringLiteral("MyMultiaddresses"));
+    LogosResult addrs = modules().delivery_module.getNodeInfo(QStringLiteral("MyMultiaddresses"));
     if (addrs.success) {
         setMultiaddrs(addrs.getString());
     }
@@ -409,7 +406,7 @@ void DeliveryDemoPlugin::readNodeInfo()
     // logos-delivery (liblogosdelivery) version. Exposed as the "Version"
     // getNodeInfo attribute — the same call delivery_module's own version()
     // wraps.
-    LogosResult version = m_logos->delivery_module.getNodeInfo(QStringLiteral("Version"));
+    LogosResult version = modules().delivery_module.getNodeInfo(QStringLiteral("Version"));
     if (version.success) {
         setDeliveryVersion(version.getString());
     }
@@ -419,9 +416,9 @@ void DeliveryDemoPlugin::readNodeInfo()
 }
 
 // connectionStateChanged fires on transitions only, so an adopted node is read here.
-void DeliveryDemoPlugin::readConnectionStatus()
+void DeliveryDemoBackend::readConnectionStatus()
 {
-    LogosResult status = m_logos->delivery_module.getConnectionStatus();
+    LogosResult status = modules().delivery_module.getConnectionStatus();
     if (!status.success) {
         setLastError(QStringLiteral("getConnectionStatus failed: %1").arg(status.getError()));
         return;
@@ -429,7 +426,7 @@ void DeliveryDemoPlugin::readConnectionStatus()
     setConnectionStatus(status.getString());
 }
 
-void DeliveryDemoPlugin::clearNodeInfo()
+void DeliveryDemoBackend::clearNodeInfo()
 {
     setNodeReady(false);
     setPeerId(QString());
@@ -437,10 +434,10 @@ void DeliveryDemoPlugin::clearNodeInfo()
     setDeliveryVersion(QString());
 }
 
-QString DeliveryDemoPlugin::subscribe(QString topic)
+QString DeliveryDemoBackend::subscribe(QString topic)
 {
-    if (!m_logos) return QStringLiteral("Backend not initialised");
-    LogosResult r = m_logos->delivery_module.subscribe(topic);
+    if (!isContextReady()) return QStringLiteral("Backend not initialised");
+    LogosResult r = modules().delivery_module.subscribe(topic);
     if (!r.success) {
         setLastError(QStringLiteral("subscribe(%1) failed: %2").arg(topic, r.getError()));
         return r.getError();
@@ -448,10 +445,10 @@ QString DeliveryDemoPlugin::subscribe(QString topic)
     return QString();
 }
 
-QString DeliveryDemoPlugin::unsubscribe(QString topic)
+QString DeliveryDemoBackend::unsubscribe(QString topic)
 {
-    if (!m_logos) return QStringLiteral("Backend not initialised");
-    LogosResult r = m_logos->delivery_module.unsubscribe(topic);
+    if (!isContextReady()) return QStringLiteral("Backend not initialised");
+    LogosResult r = modules().delivery_module.unsubscribe(topic);
     if (!r.success) {
         setLastError(QStringLiteral("unsubscribe(%1) failed: %2").arg(topic, r.getError()));
         return r.getError();
@@ -459,14 +456,14 @@ QString DeliveryDemoPlugin::unsubscribe(QString topic)
     return QString();
 }
 
-QString DeliveryDemoPlugin::sendMessage(QString topic, QString payloadHex)
+QString DeliveryDemoBackend::sendMessage(QString topic, QString payloadHex)
 {
-    if (!m_logos) return QStringLiteral("Backend not initialised");
+    if (!isContextReady()) return QStringLiteral("Backend not initialised");
     // The payload is arbitrary bytes; the UI provides them as a hex string.
     // send()'s payload arg is a QVariant carrying a QByteArray — pass the raw
     // bytes so they cross unchanged (a QString would be re-encoded as UTF-8).
     const QByteArray payload = QByteArray::fromHex(payloadHex.toLatin1());
-    LogosResult r = m_logos->delivery_module.send(topic, payload);
+    LogosResult r = modules().delivery_module.send(topic, payload);
     if (!r.success) {
         setLastError(QStringLiteral("send(%1) failed: %2").arg(topic, r.getError()));
         return QString();
@@ -474,10 +471,10 @@ QString DeliveryDemoPlugin::sendMessage(QString topic, QString payloadHex)
     return r.getString();  // request ID
 }
 
-QString DeliveryDemoPlugin::channelCreate(QString channelId, QString contentTopic, QString senderId)
+QString DeliveryDemoBackend::channelCreate(QString channelId, QString contentTopic, QString senderId)
 {
-    if (!m_logos) return QStringLiteral("Backend not initialised");
-    LogosResult r = m_logos->delivery_module.channelCreate(channelId, contentTopic, senderId);
+    if (!isContextReady()) return QStringLiteral("Backend not initialised");
+    LogosResult r = modules().delivery_module.channelCreate(channelId, contentTopic, senderId);
     if (!r.success) {
         setLastError(QStringLiteral("channelCreate(%1) failed: %2").arg(channelId, r.getError()));
         return r.getError();
@@ -485,10 +482,10 @@ QString DeliveryDemoPlugin::channelCreate(QString channelId, QString contentTopi
     return QString();
 }
 
-QString DeliveryDemoPlugin::channelExists(QString channelId)
+QString DeliveryDemoBackend::channelExists(QString channelId)
 {
-    if (!m_logos) return QStringLiteral("Backend not initialised");
-    LogosResult r = m_logos->delivery_module.channelExists(channelId);
+    if (!isContextReady()) return QStringLiteral("Backend not initialised");
+    LogosResult r = modules().delivery_module.channelExists(channelId);
     if (!r.success) {
         setLastError(QStringLiteral("channelExists(%1) failed: %2").arg(channelId, r.getError()));
         return QString();
@@ -496,12 +493,12 @@ QString DeliveryDemoPlugin::channelExists(QString channelId)
     return r.getString();  // "true" / "false", verbatim from the FFI
 }
 
-QString DeliveryDemoPlugin::channelSend(QString channelId, QString payloadHex)
+QString DeliveryDemoBackend::channelSend(QString channelId, QString payloadHex)
 {
-    if (!m_logos) return QStringLiteral("Backend not initialised");
+    if (!isContextReady()) return QStringLiteral("Backend not initialised");
     // Same convention as sendMessage().
     const QByteArray payload = QByteArray::fromHex(payloadHex.toLatin1());
-    LogosResult r = m_logos->delivery_module.channelSend(channelId, payload);
+    LogosResult r = modules().delivery_module.channelSend(channelId, payload);
     if (!r.success) {
         setLastError(QStringLiteral("channelSend(%1) failed: %2").arg(channelId, r.getError()));
         return QString();
@@ -509,10 +506,10 @@ QString DeliveryDemoPlugin::channelSend(QString channelId, QString payloadHex)
     return r.getString();  // request ID
 }
 
-QString DeliveryDemoPlugin::channelClose(QString channelId)
+QString DeliveryDemoBackend::channelClose(QString channelId)
 {
-    if (!m_logos) return QStringLiteral("Backend not initialised");
-    LogosResult r = m_logos->delivery_module.channelClose(channelId);
+    if (!isContextReady()) return QStringLiteral("Backend not initialised");
+    LogosResult r = modules().delivery_module.channelClose(channelId);
     if (!r.success) {
         setLastError(QStringLiteral("channelClose(%1) failed: %2").arg(channelId, r.getError()));
         return r.getError();

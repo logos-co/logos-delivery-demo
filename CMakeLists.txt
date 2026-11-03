@@ -11,7 +11,8 @@ logos_module(
     NAME delivery_demo
     REP_FILE src/delivery_demo.rep
     SOURCES
-        src/delivery_demo_interface.h
-        src/delivery_demo_plugin.h
-        src/delivery_demo_plugin.cpp
+        src/DeliveryDemoBackend.h
+        src/DeliveryDemoBackend.cpp
+    INCLUDE_DIRS
+        src
 )
