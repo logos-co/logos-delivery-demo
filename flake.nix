@@ -25,7 +25,7 @@
     # the builder resolves a declared dependency only from a same-named input.
     # delivery_module follows this one — two instances would bundle twice.
     liblogos_rln_module.url = "git+https://github.com/logos-co/logos-rln-modules?ref=main&rev=a814e7feda974a16eaa5dd50667b8fd843177f0e&dir=logos-rln-module";
-    # Same rev as delivery_module's registry provider, which follows replace.
+    # Must match delivery_module's lez pin; follows drops its own override.
     liblogos_rln_module.inputs.liblogos_lez_rln_module.url = "git+https://github.com/logos-co/logos-rln-modules?ref=main&rev=a814e7feda974a16eaa5dd50667b8fd843177f0e&dir=logos-lez-rln-module";
   };
 

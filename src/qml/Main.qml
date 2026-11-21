@@ -687,7 +687,7 @@ Item {
                            + "<code>messageReceived</code> — a peer sent us a message; <code>source</code> is <code>live</code> off the network, or <code>history</code> when Store catch-up replayed it after a restart.<br>"
                            + "<code>messageSent</code> — our outgoing message was accepted by the local node.<br>"
                            + "<code>messagePropagated</code> — the message was relayed to the network.<br>"
-                           + "<code>messageError</code> — the outgoing message failed.<br>"
+                           + "<code>messageError</code> — the outgoing message failed; <code>kind</code> is <code>NotPropagated</code> or <code>NotStored</code>.<br>"
                            + "<code>channelMessageReceived</code> — a peer sent us a message on a reliable channel.<br>"
                            + "<code>channelMessageSent</code> — every segment of a channel send was confirmed.<br>"
                            + "<code>channelMessageError</code> — a channel send finalised with a failed segment.<br>"
@@ -1044,8 +1044,8 @@ Item {
                                + "(e.g. <code>48 65 6c 6c 6f</code> or <code>48656c6c6f</code>) "
                                + "or UTF-8 text, encoded to bytes before sending.<br><br>"
                                + "On success the <code>LogosResult.getString()</code> value is the <b>message hash</b>; "
-                               + "the <code>messageSent</code> and <code>messagePropagated</code> events arrive "
-                               + "asynchronously and carry the same hash."
+                               + "the <code>messagePropagated</code>, <code>messageSent</code> and <code>messageError</code> "
+                               + "events arrive asynchronously and carry the same hash."
                         onCall: function(arg1, arg2) { root.callSend(arg1, root.encodePayload(arg2)) }
                     }
                 }
