@@ -6,7 +6,7 @@ A small `ui_qml` module that demonstrates **how an application uses [`logos-deli
 
 This repo is the runnable companion to the journey doc [**Use the Logos Delivery module API from an app**](https://github.com/logos-co/logos-docs/blob/main/docs/messaging/journeys/use-the-logos-delivery-module-api-from-an-app.md) — every code path in the doc is exercised here, and every interactive control has an info button explaining which `delivery_module` API call it triggers.
 
-Pinned to `logos-delivery-module` [**`v0.3.0`**](https://github.com/logos-co/logos-delivery-module/tree/v0.3.0).
+Pinned to `logos-delivery-module` [**`v0.4.0-rc.1`**](https://github.com/logos-co/logos-delivery-module/tree/v0.4.0-rc.1).
 
 ![Screenshot of the demo running on logos.dev](docs/screenshot.png)
 
@@ -17,7 +17,7 @@ Pinned to `logos-delivery-module` [**`v0.3.0`**](https://github.com/logos-co/log
 - Bootstrapping the node from the UI with `createNode(...)` and `start()`, with `LogosResult` checks — the fleet (`logos.test` / `logos.dev`, defaulting to `logos.test`), node mode (`Core` / `Edge`) and sender anonymity level (`None` / `Preferred` / `Required`) are picked from dropdowns
 - An **advanced** toggle that swaps those dropdowns for the raw `createNode` config, so the parts the dropdowns don't reach are still reachable — `entry-node` to peer with a local node instead of a fleet, `cluster-id`, ports, or a lower `entryLayer`. The config passes through to logos-delivery verbatim; the demo only checks it is well-formed JSON
 - Following RLN bring-up with `rlnState()` and `rlnStateChanged` — the preset given to `createNode` decides whether RLN is on and which deployment it uses, so there is nothing to configure
-- Reading the node's fixed attributes through `getNodeInfo` — `MyPeerId`, `MyMultiaddresses` and the `logos-delivery` library `Version`. They are constant for the life of the node, so they are read once (when the view opens and on `nodeStarted`) rather than polled
+- Reading the node's fixed attributes through `getNodeInfo` — `PeerId`, `Multiaddrs` and the `logos-delivery` library `Version`. They are constant for the life of the node, so they are read once (when the view opens and on `nodeStarted`) rather than polled
 - Surfacing `connectionStateChanged` as a live status badge
 - The **Reliable Channels API**: `channelCreate(channelId, contentTopic, senderId)` / `channelExists` / `channelSend` / `channelClose`, with the `channelMessageReceived` / `channelMessageSent` / `channelMessageError` events surfaced in the event log
 - A **global event log** that renders every observed event verbatim — `messageReceived`, `messageSent`, `messagePropagated`, `messageError`, `channelMessageReceived`, `channelMessageSent`, `channelMessageError`, plus the local return values of every playground call — colour-coded by event kind, with every field selectable so you can copy hashes, topics, payloads, request ids
@@ -130,7 +130,7 @@ The demo specifies no ports, and its layered config gets ephemeral p2p ports fro
 ## References
 
 - [Journey doc — Use the Logos Delivery module API from an app](https://github.com/logos-co/logos-docs/blob/main/docs/messaging/journeys/use-the-logos-delivery-module-api-from-an-app.md)
-- [`logos-delivery-module` @ v0.3.0](https://github.com/logos-co/logos-delivery-module/tree/v0.3.0) — the module this demo drives
+- [`logos-delivery-module` @ v0.4.0-rc.1](https://github.com/logos-co/logos-delivery-module/tree/v0.4.0-rc.1) — the module this demo drives
 - [`logos-module-builder` — the Nix flake library this demo builds with](https://github.com/logos-co/logos-module-builder)
 - [Logos module developer guide](https://github.com/logos-co/logos-tutorial/blob/master/logos-developer-guide.md) — full walkthrough of module dev, `LogosResult`, generated wrappers
 - [LIP-23 — content topic format](https://lip.logos.co/messaging/informational/23/topics.html)

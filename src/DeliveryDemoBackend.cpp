@@ -88,13 +88,13 @@ void DeliveryDemoBackend::wireEvents()
     });
 
     modules().delivery_module.on("messageSent", [this](const QVariantList& data) {
-        if (data.size() < 3) return;
-        emit messageSentNotif(data.at(0).toString(), data.at(1).toString(), data.at(2).toLongLong());
+        if (data.size() < 2) return;
+        emit messageSentNotif(data.at(0).toString(), data.at(1).toLongLong());
     });
 
     modules().delivery_module.on("messagePropagated", [this](const QVariantList& data) {
-        if (data.size() < 3) return;
-        emit messagePropagatedNotif(data.at(0).toString(), data.at(1).toString(), data.at(2).toLongLong());
+        if (data.size() < 2) return;
+        emit messagePropagatedNotif(data.at(0).toString(), data.at(1).toLongLong());
     });
 
     modules().delivery_module.on("messageError", [this](const QVariantList& data) {
@@ -392,13 +392,13 @@ void DeliveryDemoBackend::readNodeInfo()
         return;
     }
 
-    LogosResult peer = modules().delivery_module.getNodeInfo(QStringLiteral("MyPeerId"));
+    LogosResult peer = modules().delivery_module.getNodeInfo(QStringLiteral("PeerId"));
     if (peer.success) {
         setPeerId(peer.getString());
     }
 
     // Feeding one of these to another node's entry-node peers them locally.
-    LogosResult addrs = modules().delivery_module.getNodeInfo(QStringLiteral("MyMultiaddresses"));
+    LogosResult addrs = modules().delivery_module.getNodeInfo(QStringLiteral("Multiaddrs"));
     if (addrs.success) {
         setMultiaddrs(addrs.getString());
     }
@@ -468,7 +468,7 @@ QString DeliveryDemoBackend::sendMessage(QString topic, QString payloadHex)
         setLastError(QStringLiteral("send(%1) failed: %2").arg(topic, r.getError()));
         return QString();
     }
-    return r.getString();  // request ID
+    return r.getString();  // message hash
 }
 
 QString DeliveryDemoBackend::channelCreate(QString channelId, QString contentTopic, QString senderId)

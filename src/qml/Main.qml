@@ -24,7 +24,7 @@ Item {
     readonly property bool utf8Payloads: payloadFormatBox.currentIndex === 1
 
     // Single global event log. Each entry is an observed event:
-    //   { eventName, direction, config, topic, payload, hash, source, requestId, errorText, ts }
+    //   { eventName, direction, config, topic, payload, hash, source, kind, requestId, errorText, ts }
     property var events: []
 
     readonly property string nodeStatus:    backend ? backend.connectionStatus : "no backend"
@@ -78,30 +78,28 @@ Item {
                 ts: timestamp
             })
         }
-        function onMessageSentNotif(requestId, messageHash, timestamp) {
+        function onMessageSentNotif(messageHash, timestamp) {
             root.logEvent({
                 eventName: "messageSent",
                 direction: "out",
-                requestId: requestId,
                 hash: messageHash,
                 ts: timestamp
             })
         }
-        function onMessagePropagatedNotif(requestId, messageHash, timestamp) {
+        function onMessagePropagatedNotif(messageHash, timestamp) {
             root.logEvent({
                 eventName: "messagePropagated",
                 direction: "out",
-                requestId: requestId,
                 hash: messageHash,
                 ts: timestamp
             })
         }
-        function onMessageErrorNotif(requestId, messageHash, errorText, timestamp) {
+        function onMessageErrorNotif(messageHash, kind, errorText, timestamp) {
             root.logEvent({
                 eventName: "messageError",
                 direction: "out",
-                requestId: requestId,
                 hash: messageHash,
+                kind: kind,
                 errorText: errorText,
                 ts: timestamp
             })
@@ -351,13 +349,13 @@ Item {
     function callSend(topic, payload) {
         if (!topic || !payload) return
         logos.watch(backend.sendMessage(topic, payload),
-            function(requestId) {
+            function(messageHash) {
                 root.logEvent({
                     eventName: "send() returned",
                     direction: "local",
                     topic: topic,
                     payload: payload,
-                    requestId: requestId || "(empty — see lastError)"
+                    hash: messageHash || "(empty — see lastError)"
                 })
             },
             function(_e) {}
@@ -568,7 +566,7 @@ Item {
                     }
                     InfoChip {
                         tip: "<b>Peer ID</b> — this node's local libp2p peer identifier.<br><br>"
-                           + "Returned by <code>delivery_module.getNodeInfo(\"MyPeerId\")</code>. "
+                           + "Returned by <code>delivery_module.getNodeInfo(\"PeerId\")</code>. "
                            + "Fixed for the life of the node, so it is read once — when this "
                            + "view opens and on the node's <code>nodeStarted</code> event — "
                            + "rather than polled. Whether a node is running at all, "
@@ -626,7 +624,7 @@ Item {
                     }
                     InfoChip {
                         tip: "<b>Multiaddr</b> — every address this node listens on, as the "
-                           + "verbatim <code>getNodeInfo(\"MyMultiaddresses\")</code> string.<br><br>"
+                           + "verbatim <code>getNodeInfo(\"Multiaddrs\")</code> string.<br><br>"
                            + "Read once per node, alongside the peer id.<br><br>"
                            + "Paste one into another node's <code>entry-node</code> config to "
                            + "peer two local nodes directly instead of bootstrapping off a "
@@ -689,7 +687,7 @@ Item {
                            + "<code>messageReceived</code> — a peer sent us a message; <code>source</code> is <code>live</code> off the network, or <code>history</code> when Store catch-up replayed it after a restart.<br>"
                            + "<code>messageSent</code> — our outgoing message was accepted by the local node.<br>"
                            + "<code>messagePropagated</code> — the message was relayed to the network.<br>"
-                           + "<code>messageError</code> — the outgoing message failed.<br>"
+                           + "<code>messageError</code> — the outgoing message failed; <code>kind</code> is <code>NotPropagated</code> or <code>NotStored</code>.<br>"
                            + "<code>channelMessageReceived</code> — a peer sent us a message on a reliable channel.<br>"
                            + "<code>channelMessageSent</code> — every segment of a channel send was confirmed.<br>"
                            + "<code>channelMessageError</code> — a channel send finalised with a failed segment.<br>"
@@ -1045,9 +1043,9 @@ Item {
                                + "in the format selected in the header: hex "
                                + "(e.g. <code>48 65 6c 6c 6f</code> or <code>48656c6c6f</code>) "
                                + "or UTF-8 text, encoded to bytes before sending.<br><br>"
-                               + "On success the <code>LogosResult.getString()</code> value is the <b>request id</b>; "
-                               + "the <code>messageSent</code> and <code>messagePropagated</code> events arrive "
-                               + "asynchronously and carry the same request id."
+                               + "On success the <code>LogosResult.getString()</code> value is the <b>message hash</b>; "
+                               + "the <code>messagePropagated</code>, <code>messageSent</code> and <code>messageError</code> "
+                               + "events arrive asynchronously and carry the same hash."
                         onCall: function(arg1, arg2) { root.callSend(arg1, root.encodePayload(arg2)) }
                     }
                 }
@@ -1642,6 +1640,7 @@ Item {
             FieldRow { name: "payload";   value: evt && evt.payload ? root.formatPayload(evt.payload) : ""; mono: true; multiline: true; truncateAt: 480 }
             FieldRow { name: "hash";      value: evt ? evt.hash      || "" : ""; mono: true }
             FieldRow { name: "source";    value: evt ? evt.source    || "" : ""; mono: true }
+            FieldRow { name: "kind";      value: evt ? evt.kind      || "" : ""; mono: true }
             FieldRow { name: "requestId"; value: evt ? evt.requestId || "" : ""; mono: true }
             FieldRow { name: "result";    value: evt ? evt.result    || "" : ""; mono: true }
             FieldRow { name: "error";     value: evt ? evt.errorText || "" : ""; isError: true; multiline: true }
