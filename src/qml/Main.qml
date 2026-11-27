@@ -1006,7 +1006,6 @@ Item {
                 ApiGroup {
                     id: messagingGroup
                     title: "Messaging"
-                    tag: "Beta"
                     SplitView.preferredWidth: apiSplit.width / 2
                     SplitView.minimumWidth: 280
 
